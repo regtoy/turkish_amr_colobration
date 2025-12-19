@@ -20,8 +20,7 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - **Annotation:** penman_text, normalize edilmiş graph, validity raporu, versiyonlama (state ve validasyon raporuyla bağlı).
 - **Review:** karar (approve/reject/needs-fix), puanlama, yorum.
 - **Adjudication/Gold:** final_penman, hangi anotasyonlardan türetildi, karar notu.
-- **Audit Log:** tüm değişiklikler, eski-yeni değerler (PII ve erişim düzeyi sınırlamalarıyla).
-
+- **Hatalı/Red Edilmiş Gönderim Arşivi:** DPO veya benzeri kalite eğitimi/araçları için saklanan başarısız validasyon veya reject edilmiş anotasyonlar; meta ile birlikte export edilebilir.
 ### 3.1 Durum makinesi (Sentence/Annotation)
 - **Sentence durumları:** NEW → ASSIGNED → SUBMITTED → IN_REVIEW → ADJUDICATED → ACCEPTED.
 - **Geçiş yetkileri:**
@@ -47,7 +46,7 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - **Rol seti kaynağı/versiyonu:** PropBank sürümü + proje spesifik TR rol rehberi (versiyonlanır, Project kaydında tutulur); validasyon bu versiyona göre yapılır.
 - **Zorunlu:** parse edilebilirlik, tek kök, dengeli parantez, geçerli triple, rol seti uyumu, değişken tutarlılığı, reentrancy, canonical format (indent/policy).
 - **Opsiyonel sinyaller:** lint puanı, rol eksikliği, kopuk alt ağaç, aşırı literal node, Türkçeye özgü kip/olumsuzluk checklist (rehber/versiyon bilgisiyle).
-- Sunucu tarafı doğrulama; bloklayıcı/uyarı/info sınıflarıyla istemciye raporlanır; doğrulama kuralları versiyonlanır.
+- Sunucu tarafı doğrulama; bloklayıcı/uyarı/info sınıflarıyla istemciye raporlanır; doğrulama kuralları versiyonlanır. Başarısız doğrulamalar ve reddedilen gönderimler, yeniden eğitim (örn. DPO) veya kalite analizi için, anonimleştirilebilir meta ile birlikte arşivlenebilir.
 
 ## 6) Collaboration ve iş akışı
 - Atama stratejileri: round-robin, skill-based, blind; yeniden atama (düşük güven/hata) opsiyonu.
@@ -63,6 +62,7 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - Toplu cümle import: CSV/JSON/TXT, dupe kontrolü (hash/benzerlik), batch etiketleri.
 - Dashboard: ilerleme durumları, anotatör/reviewer performansı, iş yükü.
 - Export: # ::id, # ::snt + final PENMAN (pretty, canonical); seçenekler: yalnızca gold, gold+silver, tüm versiyonlar; validasyon özeti + provenance dahil.
+- Hatalı/Rejected export: Başarısız validasyonlar ve reviewer/curator tarafından reject edilmiş anotasyonlar; model eğitimi/DPO için negatif örnek seti olarak, PII filtreli/anonymize seçeneğiyle paketlenir.
 
 ## 9) Teknik mimari
 - **Frontend:** Web UI (PENMAN editor, grafik renderer), review/curation ekranları, yorum/bildirim.
