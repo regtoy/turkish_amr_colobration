@@ -28,6 +28,10 @@ Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri
 
 Kimlik doğrulama yerinde “hafif” tutulmuştur: her isteğe `X-User-Id` ve `X-User-Role` header’ları eklenmelidir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır.
 
+## Durum değerlendirme ve audit
+- **Proje özeti:** `GET /projects/{project_id}/summary` (admin/curator) — cümle durum dağılımı, atama ve değerlendirme sayıları.
+- **Audit kayıtları:** `GET /audit?project_id=...` (admin tüm kayıtlar, curator proje filtresi ile) — aksiyon bazlı audit log erişimi ve filtreleme.
+
 ## Sonraki Adımlar
 - JWT tabanlı gerçek kimlik doğrulama ve kullanıcı yönetimi.
 - Review/curation ekranlarını destekleyecek ayrıntılı audit log ve versiyonlama (temel audit altyapısı eklendi, veri modelinde mevcut).

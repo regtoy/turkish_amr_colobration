@@ -47,3 +47,13 @@ class AdjudicationSubmit(SQLModel):
 
 class ReopenRequest(SQLModel):
     reason: Optional[str] = None
+
+
+class ProjectSummary(SQLModel):
+    project_id: int
+    total_sentences: int
+    statuses: dict[str, int]
+    assignments_by_role: dict[str, int]
+    annotations: int
+    reviews: int
+    adjudications: int

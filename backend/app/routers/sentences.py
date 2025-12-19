@@ -54,6 +54,7 @@ def create_sentence(
         entity_id=sentence.id,
         before_status=None,
         after_status=SentenceStatus.NEW,
+        project_id=project_id,
         metadata={"project_id": project_id, "source": payload.source, "difficulty_tag": payload.difficulty_tag},
     )
     session.commit()
@@ -86,6 +87,7 @@ def assign_sentence(
         entity_id=sentence.id,
         before_status=before_status,
         after_status=SentenceStatus.ASSIGNED,
+        project_id=sentence.project_id,
         metadata={"assignment_id": assignment.id, "assignee_role": payload.role.value, "is_blind": payload.is_blind},
     )
     session.commit()
@@ -132,6 +134,7 @@ def submit_annotation(
         entity_id=sentence.id,
         before_status=before_status,
         after_status=SentenceStatus.SUBMITTED,
+        project_id=sentence.project_id,
         metadata={"annotation_id": annotation.id, "assignment_id": assignment.id},
     )
     session.commit()
@@ -184,6 +187,7 @@ def review_annotation(
         entity_id=sentence.id,
         before_status=before_status,
         after_status=sentence.status,
+        project_id=sentence.project_id,
         metadata={
             "review_id": review.id,
             "annotation_id": payload.annotation_id,
@@ -235,6 +239,7 @@ def adjudicate_sentence(
         entity_id=sentence.id,
         before_status=before_status,
         after_status=SentenceStatus.ADJUDICATED,
+        project_id=sentence.project_id,
         metadata={
             "adjudication_id": adjudication.id,
             "decision_note": payload.decision_note,
@@ -268,6 +273,7 @@ def accept_sentence(
         entity_id=sentence.id,
         before_status=before_status,
         after_status=SentenceStatus.ACCEPTED,
+        project_id=sentence.project_id,
     )
     session.commit()
     session.refresh(sentence)
@@ -302,6 +308,7 @@ def reopen_adjudication(
         entity_id=sentence.id,
         before_status=before_status,
         after_status=SentenceStatus.IN_REVIEW,
+        project_id=sentence.project_id,
         metadata={"reason": payload.reason},
     )
     session.commit()
