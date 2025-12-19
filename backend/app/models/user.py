@@ -11,5 +11,6 @@ class User(SQLModel, table=True):
     username: str = Field(index=True, nullable=False, max_length=64)
     email: Optional[str] = Field(default=None, index=True, max_length=255)
     role: Role = Field(default=Role.PENDING, nullable=False)
+    hashed_password: str = Field(nullable=False, max_length=255)
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
     is_active: bool = Field(default=True, nullable=False)

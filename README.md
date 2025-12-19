@@ -16,6 +16,12 @@ uvicorn app.main:app --reload
 
 Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri `.env` dosyasıyla yönetilebilir (örn. `DATABASE_URL`, `DATABASE_ECHO`).
 
+### Kimlik doğrulama
+- **Kayıt:** `POST /auth/register` (username, password zorunlu; rol `pending` olarak başlar)
+- **Giriş:** `POST /auth/token` — `Authorization: Bearer <token>` header’ı ile sonraki isteklere eklenir.
+- **Konfig:** `SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` ortam değişkenleri `.env` üzerinden ayarlanabilir.
+- Geçiş sürecinde eski header tabanlı kimlik doğrulama (`X-User-Id`, `X-User-Role`) geriye dönük uyumluluk için korunmuştur.
+
 ## Örnek İstek Akışı
 1. **Proje oluştur** (admin): `POST /projects`
 2. **Cümle ekle** (admin): `POST /sentences/project/{project_id}`
