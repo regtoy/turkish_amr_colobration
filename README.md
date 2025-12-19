@@ -22,11 +22,14 @@ Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri
 3. **Atama yap** (admin): `POST /sentences/{sentence_id}/assign`
 4. **Anotasyon gönder** (annotator): `POST /sentences/{sentence_id}/submit`
 5. **Review kararı ver** (reviewer): `POST /sentences/{sentence_id}/review`
+6. **Curation/Adjudication yap** (curator/admin): `POST /sentences/{sentence_id}/adjudicate`
+7. **Gold kabulü** (curator/admin): `POST /sentences/{sentence_id}/accept`
+8. **Adjudication yeniden aç** (curator/admin): `POST /sentences/{sentence_id}/reopen`
 
 Kimlik doğrulama yerinde “hafif” tutulmuştur: her isteğe `X-User-Id` ve `X-User-Role` header’ları eklenmelidir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır.
 
 ## Sonraki Adımlar
 - JWT tabanlı gerçek kimlik doğrulama ve kullanıcı yönetimi.
-- Review/curation ekranlarını destekleyecek ayrıntılı audit log ve versiyonlama.
+- Review/curation ekranlarını destekleyecek ayrıntılı audit log ve versiyonlama (temel audit altyapısı eklendi, veri modelinde mevcut).
 - Validasyon servisi entegrasyonu (PENMAN parse/lint) ve kuyruk yapısı.
 - Export paketleme ve PII temizleme seçenekleri.
