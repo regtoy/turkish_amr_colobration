@@ -51,6 +51,7 @@ def log_action(
     before_status: Optional[SentenceStatus | str] = None,
     after_status: Optional[SentenceStatus | str] = None,
     metadata: Optional[dict[str, Any]] = None,
+    project_id: Optional[int] = None,
 ) -> None:
     """Persist an audit log entry without committing the transaction."""
 
@@ -62,6 +63,7 @@ def log_action(
         entity_id=entity_id,
         before_status=_normalize_status(before_status),
         after_status=_normalize_status(after_status),
+        project_id=project_id,
         metadata=_normalize_metadata(metadata),
     )
     session.add(entry)
