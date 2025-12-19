@@ -1,0 +1,19 @@
+[project]
+name = "turkish-amr-platform"
+version = "0.1.0"
+description = "Backend scaffold for Turkish AMR collaboration platform"
+authors = [{ name = "AMR Platform Team" }]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.5",
+    "uvicorn[standard]>=0.30.6",
+    "sqlmodel>=0.0.22",
+    "pydantic-settings>=2.6.1"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pdm]
+distribution = false
