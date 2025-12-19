@@ -13,4 +13,6 @@ class Project(SQLModel, table=True):
     validation_rule_version: str = Field(default="v1", nullable=False, max_length=64)
     description: Optional[str] = Field(default=None, max_length=500)
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, nullable=False, sa_column_kwargs={"onupdate": datetime.utcnow}
+    )

@@ -21,7 +21,7 @@ Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri
 2. **Cümle ekle** (admin): `POST /sentences/project/{project_id}`
 3. **Atama yap** (admin): `POST /sentences/{sentence_id}/assign`
 4. **Anotasyon gönder** (annotator): `POST /sentences/{sentence_id}/submit`
-5. **Review karar ver** (reviewer): `POST /sentences/{sentence_id}/review`
+5. **Review kararı ver** (reviewer): `POST /sentences/{sentence_id}/review`
 
 Kimlik doğrulama yerinde “hafif” tutulmuştur: her isteğe `X-User-Id` ve `X-User-Role` header’ları eklenmelidir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır.
 

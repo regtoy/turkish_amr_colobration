@@ -14,4 +14,6 @@ class Sentence(SQLModel, table=True):
     difficulty_tag: Optional[str] = Field(default=None, max_length=64)
     status: SentenceStatus = Field(default=SentenceStatus.NEW, nullable=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, nullable=False, sa_column_kwargs={"onupdate": datetime.utcnow}
+    )

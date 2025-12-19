@@ -13,4 +13,6 @@ class Assignment(SQLModel, table=True):
     role: Role = Field(default=Role.ANNOTATOR, nullable=False)
     is_blind: bool = Field(default=False, nullable=False)
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)
+    updated_at: datetime = Field(
+        default_factory=datetime.utcnow, nullable=False, sa_column_kwargs={"onupdate": datetime.utcnow}
+    )

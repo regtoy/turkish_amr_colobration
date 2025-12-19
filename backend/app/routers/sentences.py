@@ -103,11 +103,14 @@ def review_annotation(
     sentence = _get_sentence(session, sentence_id)
     guard = WorkflowGuard(is_multi_annotator=payload.is_multi_annotator)
 
+    target_status = guard.review_to_target(payload.decision)
+
     if sentence.status == SentenceStatus.SUBMITTED:
         guard.ensure_transition(sentence.status, SentenceStatus.IN_REVIEW, user.role)
         sentence.status = SentenceStatus.IN_REVIEW
 
-    guard.ensure_transition(sentence.status, guard.review_to_target(payload.decision), user.role)
+    if sentence.status != target_status:
+        guard.ensure_transition(sentence.status, target_status, user.role)
 
     annotation = session.get(Annotation, payload.annotation_id)
     if not annotation or annotation.sentence_id != sentence_id:
@@ -121,7 +124,7 @@ def review_annotation(
         comment=payload.comment,
     )
 
-    sentence.status = guard.review_to_target(payload.decision)
+    sentence.status = target_status
     session.add(review)
     session.add(sentence)
     session.commit()
