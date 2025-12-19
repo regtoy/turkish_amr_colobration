@@ -1,3 +1,5 @@
+from datetime import datetime
+from enum import Enum
 from typing import Any, Optional
 
 from sqlmodel import Session
@@ -12,6 +14,30 @@ def _normalize_status(status: Optional[SentenceStatus | str]) -> Optional[str]:
     if isinstance(status, SentenceStatus):
         return status.value
     return str(status)
+
+
+JSONPrimitive = str | int | float | bool | None
+JSONValue = JSONPrimitive | list["JSONValue"] | dict[str, "JSONValue"]
+
+
+def _normalize_value(value: Any) -> JSONValue:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Enum):
+        return value.value  # type: ignore[return-value]
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (list, tuple)):
+        return [_normalize_value(item) for item in value]
+    if isinstance(value, dict):
+        return {str(k): _normalize_value(v) for k, v in value.items()}
+    return str(value)
+
+
+def _normalize_metadata(metadata: Optional[dict[str, Any]]) -> Optional[dict[str, JSONValue]]:
+    if metadata is None:
+        return None
+    return {str(key): _normalize_value(value) for key, value in metadata.items()}
 
 
 def log_action(
@@ -36,6 +62,6 @@ def log_action(
         entity_id=entity_id,
         before_status=_normalize_status(before_status),
         after_status=_normalize_status(after_status),
-        metadata=metadata or None,
+        metadata=_normalize_metadata(metadata),
     )
     session.add(entry)

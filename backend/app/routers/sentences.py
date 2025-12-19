@@ -206,6 +206,7 @@ def adjudicate_sentence(
 ) -> Adjudication:
     sentence = _get_sentence(session, sentence_id)
     require_roles(user.role, {Role.ADMIN, Role.CURATOR})
+    before_status = sentence.status
     if sentence.status != SentenceStatus.IN_REVIEW:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -232,7 +233,7 @@ def adjudicate_sentence(
         action="adjudication_completed",
         entity_type="sentence",
         entity_id=sentence.id,
-        before_status=SentenceStatus.IN_REVIEW,
+        before_status=before_status,
         after_status=SentenceStatus.ADJUDICATED,
         metadata={
             "adjudication_id": adjudication.id,
@@ -282,6 +283,11 @@ def reopen_adjudication(
 ) -> Sentence:
     sentence = _get_sentence(session, sentence_id)
     require_roles(user.role, {Role.ADMIN, Role.CURATOR})
+    if sentence.status != SentenceStatus.ADJUDICATED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Yalnızca adjudication sonrası cümleler yeniden açılabilir.",
+        )
     guard = WorkflowGuard()
     guard.ensure_transition(sentence.status, SentenceStatus.IN_REVIEW, user.role)
     before_status = sentence.status
