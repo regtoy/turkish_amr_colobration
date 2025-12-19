@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from .config import get_settings
 from .database import init_db
-from .routers import audit, health, projects, sentences
+from .routers import audit, auth, health, projects, sentences
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
@@ -14,6 +14,7 @@ def on_startup() -> None:
 
 
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(audit.router)
 app.include_router(projects.router)
 app.include_router(sentences.router)
