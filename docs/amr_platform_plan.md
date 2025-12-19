@@ -21,6 +21,8 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - **Review:** karar (approve/reject/needs-fix), puanlama, yorum.
 - **Adjudication/Gold:** final_penman, hangi anotasyonlardan türetildi, karar notu.
 - **Hatalı/Red Edilmiş Gönderim Arşivi:** DPO veya benzeri kalite eğitimi/araçları için saklanan başarısız validasyon veya reject edilmiş anotasyonlar; meta ile birlikte export edilebilir.
+- **Audit Log:** tüm değişiklikler, eski-yeni değerler (PII ve erişim düzeyi sınırlamalarıyla).
+
 ### 3.1 Durum makinesi (Sentence/Annotation)
 - **Sentence durumları:** NEW → ASSIGNED → SUBMITTED → IN_REVIEW → ADJUDICATED → ACCEPTED.
 - **Geçiş yetkileri:**
@@ -31,10 +33,11 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
     - approve → ADJUDICATED (tek anotasyonlu projede) veya curation’a gider.
     - needs-fix → geri SUBMITTED (aynı anotatöre veya yeniden ata).
     - reject → ASSIGNED veya SUBMITTED (yeniden atama politikası).
+- Çoklu anotatör varsa: Curation sürecine girer, curator final ürettiğinde ADJUDICATED.
+- ADJUDICATED→ACCEPTED: Admin/Curator onayı (gold yayını).
+- **Geri dönüş sınırları:** ACCEPTED kapalı; ADJUDICATED geri açmak için sadece Admin/Curator (yeniden açıldığında önceki adjudication notu/provenance korunur, ancak final_penman taslak olarak işaretlenir ve curation/review kuyruğuna yeniden girer; gerektiğinde yeni assignment/review oluşturulur, eski assignment’lar pasiflenir); IN_REVIEW’den SUBMITTED’a reviewer “needs-fix” ile dönebilir; SUBMITTED’dan ASSIGNED’a yalnızca Admin/Assignment engine yeniden atama ile döner.
   - Çoklu anotatör varsa: Curation sürecine girer, curator final ürettiğinde ADJUDICATED.
   - ADJUDICATED→ACCEPTED: Admin/Curator onayı (gold yayını).
-- **Geri dönüş sınırları:** ACCEPTED kapalı; ADJUDICATED geri açmak için sadece Admin/Curator; IN_REVIEW’den SUBMITTED’a reviewer “needs-fix” ile dönebilir; SUBMITTED’dan ASSIGNED’a yalnızca Admin/Assignment engine yeniden atama ile döner.
-
 
 ## 4) Anotasyon arayüzü
 - Sol: cümle + bağlam; Orta: PENMAN editörü (paren eşleştirme, lint, highlight); Sağ: grafik görünüm (node/edge sürükle-bırak).
@@ -55,13 +58,13 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 
 ## 7) Review ve adjudication/curation
 - Review ekranı: anotatör çıktıları listesi, validasyon raporu, PENMAN diff/node-edge diff, puanlama rubriği, geri gönderme.
-- Curation ekranı: çoklu anotasyonu yan yana göster; node/edge seçerek birleşik final üret; final normalize+doğrula; karar (ACCEPTED/NEEDS_MORE_WORK).
+- Curation ekranı: çoklu anotasyonları yan yana göster; node/edge seçerek birleşik final üret; final normalize+doğrula; karar (ACCEPTED/NEEDS_MORE_WORK).
 
 ## 8) Yönetici paneli
 - Kullanıcı kuyruğu: pending onayı/ret, proje bazlı rol atama.
 - Toplu cümle import: CSV/JSON/TXT, dupe kontrolü (hash/benzerlik), batch etiketleri.
 - Dashboard: ilerleme durumları, anotatör/reviewer performansı, iş yükü.
-- Export: # ::id, # ::snt + final PENMAN (pretty, canonical); seçenekler: yalnızca gold, gold+silver, tüm versiyonlar; validasyon özeti + provenance dahil.
+- Export: # ::id, # ::snt + final PENMAN (pretty, canonical); seçenekler: yalnızca gold, gold+silver, tüm versiyonlar; validasyon özeti + provenance dahil; meta üstbilgilerde proje sürümü, rol seti sürümü, doğrulama kural seti sürümü ve export zaman damgası taşınır.
 - Hatalı/Rejected export: Başarısız validasyonlar ve reviewer/curator tarafından reject edilmiş anotasyonlar; model eğitimi/DPO için negatif örnek seti olarak, PII filtreli/anonymize seçeneğiyle paketlenir.
 
 ## 9) Teknik mimari
@@ -76,6 +79,29 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - **RBAC kapsamı:** Proje bazlı roller; Annotator/Reviewer sadece kendi projelerinde atandığı cümle/anotasyonları görebilir; Curator proje bazlı tüm anotasyonları curation ekranında görebilir; Admin tüm projeleri ve audit kayıtlarını görür.
 - **Audit görünürlüğü:** Annotator/Reviewer kendi eylem kayıtlarını ve kendilerine gelen review/yorumları görür; Curator curation’a konu anotasyonların audit özetini görür; Admin tüm audit’i görür ve dışa aktarabilir.
 - **PII alanları:** Kullanıcı adı/e-posta, IP, oturum bilgisi; metin kaynağı meta verileri (kaynak sistem id vs.) PII sayılabilir. Audit/Log’da PII maskeleme veya role bağlı kısmi gösterim uygulanır; export’ta PII çıkarma/anonimleştirme seçenekleri sağlanır.
+
+### 9.2 Backend geliştirme planı (yüksek seviye)
+- **Temel servisler:** Auth+RBAC (JWT/OAuth2), Project/Assignment, Sentence/Annotation, Review, Curation, Validation (Penman tabanlı), Export, Audit.
+- **İş akışı uygulaması:** State-machine katmanı (Sentence/Annotation) ile geçiş kuralları; policy guard’larıyla rol kontrolü; retry/rollback için deterministik event log.
+- **Validation servisi:** Penman parse/normalize, zorunlu kurallar ve uyarılar; rol seti/versiyon parametreli; başarısız kayıtları arşiv endpoint’i. Queue opsiyonu: ağır validasyon/ML öneri.
+- **API sözleşmesi:** REST/JSON (opsiyonel GraphQL), idempotent PUT/PATCH; optimistic locking (version field). Webhook/event stream (opsiyonel) bildirimler için.
+- **Veri katmanı:** Postgres, JSONB raporları; soft-delete + history tabloları (audit ile birlikte). Index: sentence status, assignment, project, user.
+- **Export katmanı:** Canonical PENMAN üretimi, gold/silver/all, hatalı/rejected paketleri; PII filtre/anonymize flag; provenance ve validasyon özeti dahil.
+- **Observability:** Audit log zorunlu; structured logging; metrikler (prometheus); rate limit ve throttling.
+
+### 9.3 Frontend geliştirme planı (yüksek seviye)
+- **Teknoloji önerisi:** React/TypeScript + component kitabı (MUI/Chakra benzeri); state yönetimi (Redux/RTK Query veya React Query); i18n.
+- **Çekirdek ekranlar:**
+  - Auth/Onboarding: kayıt, pending ekranı, admin onay bilgisi.
+  - Dashboard: proje seçimi, görev listesi (Sentence durumlarına göre filtre).
+  - Annotator workspace: cümle/bağlam, PENMAN editörü (syntax highlight, paren matching), lint paneli, grafik görünümü, yorumlar.
+  - Reviewer workspace: çoklu anotasyon listesi, validasyon raporu, diff görünümü, puanlama/geri gönderme.
+  - Curation workspace: yan yana anotasyonlar, node/edge seç-birleştir, final normalize ve doğrulama.
+  - Admin paneli: kullanıcı onayı/rol atama, toplu import, atama stratejisi ayarı, metrikler.
+  - Export/Download: gold/silver/all ve hatalı/rejected paketleri, PII filtre seçimi.
+- **UI yardımcıları:** Form doğrulama, kısayollar, autocomplete rol önerileri, toast/bildirim merkezi.
+- **İstemci-validasyon entegrasyonu:** Sunucu validasyon sonuçlarını gerçek zamanlı gösterme; “ön kontrol” butonu; offline edit + sonradan senk (opsiyonel).
+- **Erişilebilirlik ve performans:** Klavye kısayolları, ARIA etiketleri; büyük cümle listelerinde sanal scroll; incremental fetch/pagination.
 
 ## 10) Opsiyonel “akıllı yardım” modülü
 - ML destekli AMR taslak önerisi + kullanıcı onayı (INCEpTION benzeri yaklaşım).
