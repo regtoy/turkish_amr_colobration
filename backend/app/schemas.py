@@ -37,3 +37,13 @@ class ReviewSubmit(SQLModel):
     score: Optional[float] = None
     comment: Optional[str] = None
     is_multi_annotator: bool = False
+
+
+class AdjudicationSubmit(SQLModel):
+    final_penman: str
+    decision_note: Optional[str] = None
+    source_annotation_ids: Optional[list[int]] = None
+
+
+class ReopenRequest(SQLModel):
+    reason: Optional[str] = None
