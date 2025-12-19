@@ -17,7 +17,10 @@ class WorkflowGuard:
             SentenceStatus.SUBMITTED: {Role.REVIEWER},
             SentenceStatus.ASSIGNED: {Role.REVIEWER, Role.ADMIN},
         },
-        SentenceStatus.ADJUDICATED: {SentenceStatus.ACCEPTED: {Role.ADMIN, Role.CURATOR}},
+        SentenceStatus.ADJUDICATED: {
+            SentenceStatus.ACCEPTED: {Role.ADMIN, Role.CURATOR},
+            SentenceStatus.IN_REVIEW: {Role.ADMIN, Role.CURATOR},
+        },
     }
 
     def __init__(self, is_multi_annotator: bool = False) -> None:
