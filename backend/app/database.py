@@ -17,19 +17,21 @@ def init_db() -> None:
 
 @contextmanager
 def session_scope() -> Iterator[Session]:
-    """Provide a transactional scope around a series of operations."""
+    """Provide a scoped session without managing transactions.
 
+    Transaction boundaries (commit/rollback) should be handled explicitly by callers.
+    """
     session = Session(engine)
     try:
         yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
     finally:
         session.close()
 
 
 def get_session() -> Iterator[Session]:
+    """FastAPI dependency yielding a database session.
+
+    Callers are responsible for transaction management.
+    """
     with session_scope() as session:
         yield session
