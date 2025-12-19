@@ -14,13 +14,28 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - Audit log: kim-ne-zaman yaptı; proje bazlı RBAC.
 
 ## 3) Veri modeli (çekirdek varlıklar)
-- **Project:** Dil (tr), AMR sürümü/kuralları, tag setleri, kalite eşikleri, öneri/ML ayarları.
+- **Project:** Dil (tr), AMR sürümü/kuralları, tag setleri, kalite eşikleri, öneri/ML ayarları; doğrulama/rol seti versiyon bilgisi.
 - **Sentence Item:** Metin, kaynak/domain, zorluk etiketi, durum (NEW/ASSIGNED/SUBMITTED/IN_REVIEW/ADJUDICATED/ACCEPTED).
-- **Assignment:** sentence_id, user_id, rol; “kaç anotör gidecek” parametresi; blind çalışma seçeneği.
-- **Annotation:** penman_text, normalize edilmiş graph, validity raporu, versiyonlama.
+- **Assignment:** sentence_id, user_id, rol; “kaç anotatöre gidecek” parametresi; blind çalışma seçeneği.
+- **Annotation:** penman_text, normalize edilmiş graph, validity raporu, versiyonlama (state ve validasyon raporuyla bağlı).
 - **Review:** karar (approve/reject/needs-fix), puanlama, yorum.
 - **Adjudication/Gold:** final_penman, hangi anotasyonlardan türetildi, karar notu.
-- **Audit Log:** tüm değişiklikler, eski-yeni değerler.
+- **Audit Log:** tüm değişiklikler, eski-yeni değerler (PII ve erişim düzeyi sınırlamalarıyla).
+
+### 3.1 Durum makinesi (Sentence/Annotation)
+- **Sentence durumları:** NEW → ASSIGNED → SUBMITTED → IN_REVIEW → ADJUDICATED → ACCEPTED.
+- **Geçiş yetkileri:**
+  - NEW→ASSIGNED: Admin/Assignment engine.
+  - ASSIGNED→SUBMITTED: Annotator kendi ataması için.
+  - SUBMITTED→IN_REVIEW: Reviewer ata/yükle (Admin veya reviewer görevi başlatır).
+  - IN_REVIEW kararları:
+    - approve → ADJUDICATED (tek anotasyonlu projede) veya curation’a gider.
+    - needs-fix → geri SUBMITTED (aynı anotatöre veya yeniden ata).
+    - reject → ASSIGNED veya SUBMITTED (yeniden atama politikası).
+  - Çoklu anotatör varsa: Curation sürecine girer, curator final ürettiğinde ADJUDICATED.
+  - ADJUDICATED→ACCEPTED: Admin/Curator onayı (gold yayını).
+- **Geri dönüş sınırları:** ACCEPTED kapalı; ADJUDICATED geri açmak için sadece Admin/Curator; IN_REVIEW’den SUBMITTED’a reviewer “needs-fix” ile dönebilir; SUBMITTED’dan ASSIGNED’a yalnızca Admin/Assignment engine yeniden atama ile döner.
+
 
 ## 4) Anotasyon arayüzü
 - Sol: cümle + bağlam; Orta: PENMAN editörü (paren eşleştirme, lint, highlight); Sağ: grafik görünüm (node/edge sürükle-bırak).
@@ -29,9 +44,10 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - “Ön kontrol” butonu: kaydetmeden parse/normalize/lint.
 
 ## 5) PENMAN/AMR doğrulama
+- **Rol seti kaynağı/versiyonu:** PropBank sürümü + proje spesifik TR rol rehberi (versiyonlanır, Project kaydında tutulur); validasyon bu versiyona göre yapılır.
 - **Zorunlu:** parse edilebilirlik, tek kök, dengeli parantez, geçerli triple, rol seti uyumu, değişken tutarlılığı, reentrancy, canonical format (indent/policy).
-- **Opsiyonel sinyaller:** lint puanı, rol eksikliği, kopuk alt ağaç, aşırı literal node, Türkçe’ye özgü kip/olumsuzluk checklist.
-- Sunucu tarafı doğrulama; bloklayıcı/uyarı/info sınıflarıyla istemciye raporlanır.
+- **Opsiyonel sinyaller:** lint puanı, rol eksikliği, kopuk alt ağaç, aşırı literal node, Türkçeye özgü kip/olumsuzluk checklist (rehber/versiyon bilgisiyle).
+- Sunucu tarafı doğrulama; bloklayıcı/uyarı/info sınıflarıyla istemciye raporlanır; doğrulama kuralları versiyonlanır.
 
 ## 6) Collaboration ve iş akışı
 - Atama stratejileri: round-robin, skill-based, blind; yeniden atama (düşük güven/hata) opsiyonu.
@@ -55,6 +71,11 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - **Queue/worker (opsiyonel):** ağır validasyon, ML öneri, export paketleme.
 - **Object storage (opsiyonel):** import/export dosyaları, log arşivleri.
 - Güvenlik: rate limit, input sanitization, audit zorunlu; export’ta PII filtre seçenekleri.
+
+### 9.1 RBAC ve audit görünürlük ilkeleri
+- **RBAC kapsamı:** Proje bazlı roller; Annotator/Reviewer sadece kendi projelerinde atandığı cümle/anotasyonları görebilir; Curator proje bazlı tüm anotasyonları curation ekranında görebilir; Admin tüm projeleri ve audit kayıtlarını görür.
+- **Audit görünürlüğü:** Annotator/Reviewer kendi eylem kayıtlarını ve kendilerine gelen review/yorumları görür; Curator curation’a konu anotasyonların audit özetini görür; Admin tüm audit’i görür ve dışa aktarabilir.
+- **PII alanları:** Kullanıcı adı/e-posta, IP, oturum bilgisi; metin kaynağı meta verileri (kaynak sistem id vs.) PII sayılabilir. Audit/Log’da PII maskeleme veya role bağlı kısmi gösterim uygulanır; export’ta PII çıkarma/anonimleştirme seçenekleri sağlanır.
 
 ## 10) Opsiyonel “akıllı yardım” modülü
 - ML destekli AMR taslak önerisi + kullanıcı onayı (INCEpTION benzeri yaklaşım).
