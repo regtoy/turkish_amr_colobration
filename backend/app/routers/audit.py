@@ -1,27 +1,34 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from ..database import get_session
 from ..dependencies import CurrentUser, get_current_user
 from ..enums import Role
 from ..models import AuditLog
+from ..schemas import AuditLogPage
 from ..services.workflow import require_roles
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 
 
-@router.get("", response_model=list[AuditLog])
+MAX_PAGE_SIZE = 200
+
+
+@router.get("", response_model=AuditLogPage)
 def list_audit_logs(
     project_id: Optional[int] = None,
     actor_id: Optional[int] = None,
     entity_type: Optional[str] = None,
     action: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user),
-) -> list[AuditLog]:
-    """List audit log entries with optional filters.
+) -> AuditLogPage:
+    """List audit log entries with optional filters and pagination.
 
     Admin users can access all logs, whereas curator users must filter by project_id.
     """
@@ -34,15 +41,24 @@ def list_audit_logs(
             detail="Curator kullanıcıları için project_id parametresi zorunludur.",
         )
 
-    query = select(AuditLog)
+    conditions = []
     if project_id is not None:
-        query = query.where(AuditLog.project_id == project_id)
+        conditions.append(AuditLog.project_id == project_id)
     if actor_id is not None:
-        query = query.where(AuditLog.actor_id == actor_id)
+        conditions.append(AuditLog.actor_id == actor_id)
     if entity_type is not None:
-        query = query.where(AuditLog.entity_type == entity_type)
+        conditions.append(AuditLog.entity_type == entity_type)
     if action is not None:
-        query = query.where(AuditLog.action == action)
+        conditions.append(AuditLog.action == action)
 
-    query = query.order_by(AuditLog.created_at.desc())
-    return list(session.exec(query))
+    total = session.exec(select(func.count()).select_from(AuditLog).where(*conditions)).scalar_one()
+
+    query = (
+        select(AuditLog)
+        .where(*conditions)
+        .order_by(AuditLog.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    items = list(session.exec(query))
+    return AuditLogPage(total=total, limit=limit, offset=offset, items=items)

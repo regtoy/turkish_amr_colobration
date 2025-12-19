@@ -53,7 +53,7 @@ def project_summary(
     for status, count in rows:
         status_counts[status.value] = count
 
-    assignment_counts: dict[str, int] = {}
+    assignment_counts: dict[str, int] = {role.value: 0 for role in Role}
     assignment_rows = session.exec(
         select(Assignment.role, func.count())
         .join(Sentence, Sentence.id == Assignment.sentence_id)
@@ -63,27 +63,24 @@ def project_summary(
     for role, count in assignment_rows:
         assignment_counts[role.value] = count
 
-    annotation_count = session.exec(
-        select(func.count())
-        .select_from(Annotation)
+    annotation_count_subq = (
+        select(func.count(Annotation.id))
         .join(Sentence, Sentence.id == Annotation.sentence_id)
         .where(Sentence.project_id == project_id)
-    ).scalar_one()
-
-    review_count = session.exec(
-        select(func.count())
-        .select_from(Review)
+    ).scalar_subquery()
+    review_count_subq = (
+        select(func.count(Review.id))
         .join(Annotation, Annotation.id == Review.annotation_id)
         .join(Sentence, Sentence.id == Annotation.sentence_id)
         .where(Sentence.project_id == project_id)
-    ).scalar_one()
-
-    adjudication_count = session.exec(
-        select(func.count())
-        .select_from(Adjudication)
+    ).scalar_subquery()
+    adjudication_count_subq = (
+        select(func.count(Adjudication.id))
         .join(Sentence, Sentence.id == Adjudication.sentence_id)
         .where(Sentence.project_id == project_id)
-    ).scalar_one()
+    ).scalar_subquery()
+    aggregation_row = session.exec(select(annotation_count_subq, review_count_subq, adjudication_count_subq)).one()
+    annotation_count, review_count, adjudication_count = aggregation_row
 
     return ProjectSummary(
         project_id=project_id,
