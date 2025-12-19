@@ -21,8 +21,6 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - **Review:** karar (approve/reject/needs-fix), puanlama, yorum.
 - **Adjudication/Gold:** final_penman, hangi anotasyonlardan türetildi, karar notu.
 - **Hatalı/Red Edilmiş Gönderim Arşivi:** DPO veya benzeri kalite eğitimi/araçları için saklanan başarısız validasyon veya reject edilmiş anotasyonlar; meta ile birlikte export edilebilir.
-- **Audit Log:** tüm değişiklikler, eski-yeni değerler (PII ve erişim düzeyi sınırlamalarıyla).
-
 ### 3.1 Durum makinesi (Sentence/Annotation)
 - **Sentence durumları:** NEW → ASSIGNED → SUBMITTED → IN_REVIEW → ADJUDICATED → ACCEPTED.
 - **Geçiş yetkileri:**
