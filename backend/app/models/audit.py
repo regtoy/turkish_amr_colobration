@@ -17,5 +17,6 @@ class AuditLog(SQLModel, table=True):
     entity_id: Optional[int] = Field(default=None, index=True)
     before_status: Optional[str] = Field(default=None, max_length=64)
     after_status: Optional[str] = Field(default=None, max_length=64)
+    project_id: Optional[int] = Field(default=None, index=True)
     metadata: Optional[dict[str, JSONValue]] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow, nullable=False)

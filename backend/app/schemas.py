@@ -3,6 +3,7 @@ from typing import Optional
 from sqlmodel import SQLModel
 
 from .enums import ReviewDecision, Role
+from .models import AuditLog
 
 
 class ProjectCreate(SQLModel):
@@ -47,3 +48,20 @@ class AdjudicationSubmit(SQLModel):
 
 class ReopenRequest(SQLModel):
     reason: Optional[str] = None
+
+
+class ProjectSummary(SQLModel):
+    project_id: int
+    total_sentences: int
+    statuses: dict[str, int]
+    assignments_by_role: dict[str, int]
+    annotations: int
+    reviews: int
+    adjudications: int
+
+
+class AuditLogPage(SQLModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[AuditLog]

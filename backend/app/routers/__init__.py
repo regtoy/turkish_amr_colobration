@@ -1,3 +1,3 @@
-from . import health, projects, sentences
+from . import audit, health, projects, sentences
 
-__all__ = ["health", "projects", "sentences"]
+__all__ = ["audit", "health", "projects", "sentences"]
