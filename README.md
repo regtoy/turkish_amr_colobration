@@ -30,6 +30,7 @@ Kimlik doğrulama yerinde “hafif” tutulmuştur: her isteğe `X-User-Id` ve `
 
 ## Durum değerlendirme ve audit
 - **Proje özeti:** `GET /projects/{project_id}/summary` (admin/curator) — cümle durum dağılımı, atama ve değerlendirme sayıları.
+- **Audit kayıtları:** `GET /audit?project_id=...&limit=50&offset=0` (admin tüm kayıtlar, curator proje filtresi ile) — aksiyon bazlı audit log erişimi ve filtreleme. Sayfalama için `limit` (max 200) ve `offset` parametreleri kullanılabilir.
 - **Audit kayıtları:** `GET /audit?project_id=...` (admin tüm kayıtlar, curator proje filtresi ile) — aksiyon bazlı audit log erişimi ve filtreleme.
 
 ## Sonraki Adımlar
