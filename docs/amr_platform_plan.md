@@ -37,6 +37,8 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 - ADJUDICATED→ACCEPTED: Admin/Curator onayı (gold yayını).
 - **Geri dönüş sınırları:** ACCEPTED kapalı; ADJUDICATED geri açmak için sadece Admin/Curator (yeniden açıldığında önceki adjudication notu/provenance korunur, ancak final_penman taslak olarak işaretlenir ve curation/review kuyruğuna yeniden girer; gerektiğinde yeni assignment/review oluşturulur, eski assignment’lar pasiflenir); IN_REVIEW’den SUBMITTED’a reviewer “needs-fix” ile dönebilir; SUBMITTED’dan ASSIGNED’a yalnızca Admin/Assignment engine yeniden atama ile döner.
 
+  - Çoklu anotatör varsa: Curation sürecine girer, curator final ürettiğinde ADJUDICATED.
+  - ADJUDICATED→ACCEPTED: Admin/Curator onayı (gold yayını).
 
 ## 4) Anotasyon arayüzü
 - Sol: cümle + bağlam; Orta: PENMAN editörü (paren eşleştirme, lint, highlight); Sağ: grafik görünüm (node/edge sürükle-bırak).
@@ -58,6 +60,7 @@ Bu metin, Türkçe AMR (PENMAN) anotasyonu için web tabanlı, çok kullanıcıl
 ## 7) Review ve adjudication/curation
 - Review ekranı: anotatör çıktıları listesi, validasyon raporu, PENMAN diff/node-edge diff, puanlama rubriği, geri gönderme.
 - Curation ekranı: çoklu anotasyonu yan yana göster; node/edge seçerek birleşik final üret; final normalize+doğrula; karar (ACCEPTED/NEEDS_MORE_WORK).
+- Curation ekranı: çoklu anotasyonları yan yana göster; node/edge seçerek birleşik final üret; final normalize+doğrula; karar (ACCEPTED/NEEDS_MORE_WORK).
 
 ## 8) Yönetici paneli
 - Kullanıcı kuyruğu: pending onayı/ret, proje bazlı rol atama.
