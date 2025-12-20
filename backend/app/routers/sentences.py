@@ -88,86 +88,6 @@ def _deactivate_assignments(
     return deactivated_ids
 
 
-def _handle_reassign_after_reject(
-    session: Session,
-    sentence_id: int,
-    guard: WorkflowGuard,
-) -> tuple[list[int], list[Assignment]]:
-    has_rejection = (
-        session.exec(
-            select(Review.id)
-            .join(Annotation, Annotation.id == Review.annotation_id)
-            .where(Annotation.sentence_id == sentence_id, Review.decision == ReviewDecision.REJECT)
-        ).first()
-        is not None
-    )
-    guard.require_rejection_for_reassignment(has_rejection=has_rejection)
-    deactivated_assignments = _deactivate_assignments(session, sentence_id)
-    return deactivated_assignments, []
-
-
-def _resolve_assignments(
-    session: Session,
-    sentence: Sentence,
-    payload: AssignmentRequest,
-    active_assignments: list[Assignment],
-) -> tuple[list[Assignment], list[int], int]:
-    requested_count = payload.count if payload.assignee_ids is None else len(payload.assignee_ids)
-    if requested_count < 1:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Atanacak kullanıcı sayısı belirtilmeli.")
-
-    assignment_engine = AssignmentEngine(session)
-    existing_assignees = {assignment.user_id for assignment in active_assignments}
-    assignee_ids = assignment_engine.select_assignees(
-        project_id=sentence.project_id,
-        strategy=payload.strategy,
-        role=payload.role,
-        count=requested_count,
-        required_skills=payload.required_skills,
-        provided_assignees=payload.assignee_ids,
-        exclude_user_ids=existing_assignees,
-    )
-
-    assignments: list[Assignment] = []
-    for assignee_id in assignee_ids:
-        assignment = Assignment(
-            sentence_id=sentence.id,
-            user_id=assignee_id,
-            role=payload.role,
-            is_blind=payload.is_blind,
-        )
-        assignments.append(assignment)
-        session.add(assignment)
-
-    return assignments, assignee_ids, requested_count
-
-
-def _assignment_log_metadata(
-    assignments: list[Assignment],
-    assignee_ids: list[int],
-    payload: AssignmentRequest,
-    requested_count: int,
-    deactivated_assignment_ids: list[int],
-) -> dict[str, Any]:
-    return {
-        "assignment_ids": [assignment.id for assignment in assignments],
-        "assignee_ids": assignee_ids,
-        "assignee_role": payload.role.value,
-        "strategy": payload.strategy.value if isinstance(payload.strategy, AssignmentStrategy) else payload.strategy,
-        "requested_count": requested_count,
-        "is_blind": payload.is_blind,
-        "required_skills": payload.required_skills,
-        "allow_multiple_assignments": payload.allow_multiple_assignments,
-        "reassign_after_reject": payload.reassign_after_reject,
-        "deactivated_assignment_ids": deactivated_assignment_ids,
-    }
-
-
-def _refresh_assignments(session: Session, assignments: list[Assignment]) -> None:
-    for assignment in assignments:
-        session.refresh(assignment)
-
-
 @router.post("/project/{project_id}", response_model=Sentence, status_code=status.HTTP_201_CREATED)
 def create_sentence(
     project_id: int,
@@ -219,15 +139,43 @@ def assign_sentence(
 
     deactivated_assignments: list[int] = []
     if payload.reassign_after_reject:
-        deactivated_assignments, active_assignments = _handle_reassign_after_reject(session, sentence_id, guard)
+        has_rejection = (
+            session.exec(
+                select(Review.id)
+                .join(Annotation, Annotation.id == Review.annotation_id)
+                .where(Annotation.sentence_id == sentence_id, Review.decision == ReviewDecision.REJECT)
+            ).first()
+            is not None
+        )
+        guard.require_rejection_for_reassignment(has_rejection=has_rejection)
+        deactivated_assignments = _deactivate_assignments(session, sentence_id)
+        active_assignments = []
 
     guard.ensure_transition(sentence.status, SentenceStatus.ASSIGNED, user.acting_role)
-    assignments, assignee_ids, requested_count = _resolve_assignments(
-        session=session,
-        sentence=sentence,
-        payload=payload,
-        active_assignments=active_assignments,
+    requested_count = payload.count if payload.assignee_ids is None else len(payload.assignee_ids)
+    if requested_count < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Atanacak kullanıcı sayısı belirtilmeli.")
+    assignment_engine = AssignmentEngine(session)
+    existing_assignees = {assignment.user_id for assignment in active_assignments}
+    assignee_ids = assignment_engine.select_assignees(
+        project_id=sentence.project_id,
+        strategy=payload.strategy,
+        role=payload.role,
+        count=requested_count,
+        required_skills=payload.required_skills,
+        provided_assignees=payload.assignee_ids,
+        exclude_user_ids=existing_assignees,
     )
+    assignments: list[Assignment] = []
+    for assignee_id in assignee_ids:
+        assignment = Assignment(
+            sentence_id=sentence_id,
+            user_id=assignee_id,
+            role=payload.role,
+            is_blind=payload.is_blind,
+        )
+        assignments.append(assignment)
+        session.add(assignment)
 
     sentence.status = SentenceStatus.ASSIGNED
     session.add(sentence)
@@ -249,10 +197,22 @@ def assign_sentence(
         before_status=before_status,
         after_status=SentenceStatus.ASSIGNED,
         project_id=sentence.project_id,
-        metadata=metadata,
+        metadata={
+            "assignment_ids": [assignment.id for assignment in assignments],
+            "assignee_ids": assignee_ids,
+            "assignee_role": payload.role.value,
+            "strategy": payload.strategy.value if isinstance(payload.strategy, AssignmentStrategy) else payload.strategy,
+            "requested_count": requested_count,
+            "is_blind": payload.is_blind,
+            "required_skills": payload.required_skills,
+            "allow_multiple_assignments": payload.allow_multiple_assignments,
+            "reassign_after_reject": payload.reassign_after_reject,
+            "deactivated_assignment_ids": deactivated_assignments,
+        },
     )
     session.commit()
-    _refresh_assignments(session, assignments)
+    for assignment in assignments:
+        session.refresh(assignment)
     return assignments
 
 
