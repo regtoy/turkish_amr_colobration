@@ -1,10 +1,12 @@
+from typing import Any, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
 from ..database import get_session
 from ..dependencies import CurrentUser, get_current_user
-from ..enums import Role, SentenceStatus
-from ..models import Adjudication, Annotation, Assignment, Project, Review, Sentence
+from ..enums import ReviewDecision, Role, SentenceStatus
+from ..models import Adjudication, Annotation, Assignment, FailedSubmission, Project, Review, Sentence
 from ..schemas import (
     AdjudicationSubmit,
     AnnotationSubmit,
@@ -14,6 +16,7 @@ from ..schemas import (
     SentenceCreate,
 )
 from ..services.audit import log_action
+from ..services.validation import ValidationService
 from ..services.workflow import WorkflowGuard, require_roles
 
 router = APIRouter(prefix="/sentences", tags=["sentences"])
@@ -31,6 +34,40 @@ def _get_sentence(session: Session, sentence_id: int) -> Sentence:
     if not sentence:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cümle bulunamadı")
     return sentence
+
+
+def _record_failed_submission(
+    session: Session,
+    *,
+    project: Project,
+    sentence: Sentence,
+    failure_type: str,
+    reason: str,
+    details: dict[str, Any],
+    assignment_id: Optional[int] = None,
+    annotation_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    reviewer_id: Optional[int] = None,
+    penman_text: Optional[str] = None,
+) -> FailedSubmission:
+    failure = FailedSubmission(
+        project_id=project.id,
+        sentence_id=sentence.id,
+        assignment_id=assignment_id,
+        annotation_id=annotation_id,
+        user_id=user_id,
+        reviewer_id=reviewer_id,
+        failure_type=failure_type,
+        reason=reason,
+        details=details,
+        amr_version=project.amr_version,
+        role_set_version=project.role_set_version,
+        rule_version=project.validation_rule_version,
+        submitted_penman=penman_text,
+    )
+    session.add(failure)
+    session.flush()
+    return failure
 
 
 @router.post("/project/{project_id}", response_model=Sentence, status_code=status.HTTP_201_CREATED)
@@ -103,6 +140,7 @@ def submit_annotation(
     user: CurrentUser = Depends(get_current_user),
 ) -> Annotation:
     sentence = _get_sentence(session, sentence_id)
+    project = _get_project(session, sentence.project_id)
     assignment = session.exec(
         select(Assignment).where(
             Assignment.sentence_id == sentence_id, Assignment.user_id == user.user_id
@@ -114,12 +152,39 @@ def submit_annotation(
     guard = WorkflowGuard()
     before_status = sentence.status
     guard.ensure_transition(sentence.status, SentenceStatus.SUBMITTED, user.acting_role)
+
+    validator = ValidationService(
+        amr_version=project.amr_version,
+        role_set_version=project.role_set_version,
+        rule_version=project.validation_rule_version,
+    )
+    report = validator.validate(payload.penman_text)
+    report_json = report.to_json()
+
+    if not report.is_valid:
+        _record_failed_submission(
+            session,
+            project=project,
+            sentence=sentence,
+            failure_type="validation",
+            reason="Validasyon başarısız.",
+            details=report.to_dict(),
+            assignment_id=assignment.id,
+            user_id=user.user_id,
+            penman_text=payload.penman_text,
+        )
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": "Validasyon hatası", "errors": report.to_dict().get("errors", [])},
+        )
+
     annotation = Annotation(
         sentence_id=sentence_id,
         assignment_id=assignment.id,
         author_id=user.user_id,
-        penman_text=payload.penman_text,
-        validity_report=payload.validity_report,
+        penman_text=report.canonical_penman or payload.penman_text,
+        validity_report=report_json,
     )
     sentence.status = SentenceStatus.SUBMITTED
     session.add(annotation)
@@ -150,6 +215,7 @@ def review_annotation(
     user: CurrentUser = Depends(get_current_user),
 ) -> Sentence:
     sentence = _get_sentence(session, sentence_id)
+    project = _get_project(session, sentence.project_id)
     guard = WorkflowGuard(is_multi_annotator=payload.is_multi_annotator)
     before_status = sentence.status
 
@@ -178,6 +244,25 @@ def review_annotation(
     session.add(review)
     session.add(sentence)
     session.flush()
+    if payload.decision == ReviewDecision.REJECT:
+        _record_failed_submission(
+            session,
+            project=project,
+            sentence=sentence,
+            failure_type="review_reject",
+            reason=payload.comment or "Reviewer tarafından reddedildi.",
+            details={
+                "review_id": review.id,
+                "annotation_id": payload.annotation_id,
+                "decision": payload.decision.value,
+                "score": payload.score,
+            },
+            annotation_id=annotation.id,
+            assignment_id=annotation.assignment_id,
+            user_id=annotation.author_id,
+            reviewer_id=user.user_id,
+            penman_text=annotation.penman_text,
+        )
     log_action(
         session,
         actor_id=user.user_id,

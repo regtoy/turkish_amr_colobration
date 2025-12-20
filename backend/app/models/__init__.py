@@ -2,6 +2,7 @@ from .adjudication import Adjudication
 from .annotation import Annotation
 from .assignment import Assignment
 from .audit import AuditLog
+from .failed_submission import FailedSubmission
 from .project import Project
 from .membership import ProjectMembership
 from .review import Review
@@ -13,6 +14,7 @@ __all__ = [
     "Annotation",
     "Assignment",
     "AuditLog",
+    "FailedSubmission",
     "ProjectMembership",
     "Project",
     "Review",
