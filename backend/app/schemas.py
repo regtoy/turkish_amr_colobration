@@ -92,3 +92,21 @@ class TokenResponse(SQLModel):
     token_type: str = "bearer"
     user_id: int
     role: Role
+
+
+class ProjectMembershipRequest(SQLModel):
+    user_id: int
+    role: Role
+
+
+class ProjectMembershipUpdate(SQLModel):
+    role: Optional[Role] = None
+    is_active: Optional[bool] = None
+
+
+class ProjectMembershipPublic(SQLModel):
+    user_id: int
+    project_id: int
+    role: Role
+    is_active: bool
+    approved_at: Optional[datetime] = None

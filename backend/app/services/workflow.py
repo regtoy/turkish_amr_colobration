@@ -2,6 +2,7 @@ from typing import Iterable, Set
 
 from fastapi import HTTPException, status
 
+from ..dependencies import CurrentUser
 from ..enums import ReviewDecision, Role, SentenceStatus
 
 
@@ -9,13 +10,13 @@ class WorkflowGuard:
     """Encapsulates the sentence status state machine."""
 
     _transitions: dict[SentenceStatus, dict[SentenceStatus, Set[Role]]] = {
-        SentenceStatus.NEW: {SentenceStatus.ASSIGNED: {Role.ADMIN, Role.ASSIGNMENT_ENGINE}},
+        SentenceStatus.NEW: {SentenceStatus.ASSIGNED: {Role.ADMIN, Role.ASSIGNMENT_ENGINE, Role.CURATOR}},
         SentenceStatus.ASSIGNED: {SentenceStatus.SUBMITTED: {Role.ANNOTATOR}},
-        SentenceStatus.SUBMITTED: {SentenceStatus.IN_REVIEW: {Role.ADMIN, Role.REVIEWER}},
+        SentenceStatus.SUBMITTED: {SentenceStatus.IN_REVIEW: {Role.ADMIN, Role.REVIEWER, Role.CURATOR}},
         SentenceStatus.IN_REVIEW: {
             SentenceStatus.ADJUDICATED: {Role.REVIEWER, Role.ADMIN, Role.CURATOR},
             SentenceStatus.SUBMITTED: {Role.REVIEWER},
-            SentenceStatus.ASSIGNED: {Role.REVIEWER, Role.ADMIN},
+            SentenceStatus.ASSIGNED: {Role.REVIEWER, Role.ADMIN, Role.CURATOR},
         },
         SentenceStatus.ADJUDICATED: {
             SentenceStatus.ACCEPTED: {Role.ADMIN, Role.CURATOR},
@@ -50,9 +51,15 @@ class WorkflowGuard:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz review kararı")
 
 
-def require_roles(actor: Role, allowed: Iterable[Role]) -> None:
-    if actor not in set(allowed):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"{actor} rolü bu işlem için yetkili değil.",
-        )
+def require_roles(user: CurrentUser, allowed: Iterable[Role], *, use_project_roles: bool = False) -> Role:
+    allowed_set = set(allowed)
+    if user.role == Role.ADMIN:
+        return user.role
+    if use_project_roles and user.project_role in allowed_set:
+        return user.project_role  # type: ignore[return-value]
+    if user.role in allowed_set:
+        return user.role
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"{user.acting_role} rolü bu işlem için yetkili değil.",
+    )

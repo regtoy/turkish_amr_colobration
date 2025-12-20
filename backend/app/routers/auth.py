@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
@@ -8,7 +8,9 @@ from ..database import get_session
 from ..enums import Role
 from ..models import User
 from ..schemas import TokenResponse, UserCreate, UserLogin, UserPublic
+from ..services.audit import log_action
 from ..services.security import create_access_token, hash_password, verify_password
+from ..dependencies import admin_user, CurrentUser
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -45,3 +47,38 @@ def login_user(payload: UserLogin, session: Session = Depends(get_session)) -> T
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
     )
     return TokenResponse(access_token=access_token, token_type="bearer", user_id=user.id, role=user.role)
+
+
+@router.get("/pending", response_model=list[UserPublic])
+def list_pending_users(session: Session = Depends(get_session), _: CurrentUser = Depends(admin_user)) -> list[UserPublic]:
+    return list(session.exec(select(User).where(User.role == Role.PENDING)))
+
+
+@router.post("/approve/{user_id}", response_model=UserPublic)
+def approve_user(
+    user_id: int, session: Session = Depends(get_session), admin: CurrentUser = Depends(admin_user)
+) -> UserPublic:
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kullanıcı bulunamadı")
+    if user.role != Role.PENDING:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Kullanıcı zaten onaylanmış")
+
+    before_role = user.role
+    user.role = Role.GUEST
+    user.is_active = True
+    session.add(user)
+    log_action(
+        session,
+        actor_id=admin.user_id,
+        actor_role=admin.acting_role,
+        action="user_approved",
+        entity_type="user",
+        entity_id=user.id,
+        before_status=before_role.value,
+        after_status=user.role.value,
+        metadata={"approved_at": datetime.utcnow().isoformat()},
+    )
+    session.commit()
+    session.refresh(user)
+    return user
