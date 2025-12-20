@@ -40,7 +40,7 @@ def create_sentence(
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user),
 ) -> Sentence:
-    require_roles(user.role, {Role.ADMIN})
+    require_roles(user, {Role.ADMIN, Role.CURATOR}, use_project_roles=True)
     _get_project(session, project_id)
     sentence = Sentence(project_id=project_id, **payload.dict())
     session.add(sentence)
@@ -48,7 +48,7 @@ def create_sentence(
     log_action(
         session,
         actor_id=user.user_id,
-        actor_role=user.role,
+        actor_role=user.acting_role,
         action="sentence_created",
         entity_type="sentence",
         entity_id=sentence.id,
@@ -72,7 +72,7 @@ def assign_sentence(
     sentence = _get_sentence(session, sentence_id)
     guard = WorkflowGuard()
     before_status = sentence.status
-    guard.ensure_transition(sentence.status, SentenceStatus.ASSIGNED, user.role)
+    guard.ensure_transition(sentence.status, SentenceStatus.ASSIGNED, user.acting_role)
     assignment = Assignment(sentence_id=sentence_id, **payload.dict())
     sentence.status = SentenceStatus.ASSIGNED
     session.add(assignment)
@@ -81,7 +81,7 @@ def assign_sentence(
     log_action(
         session,
         actor_id=user.user_id,
-        actor_role=user.role,
+        actor_role=user.acting_role,
         action="sentence_assigned",
         entity_type="sentence",
         entity_id=sentence.id,
@@ -113,7 +113,7 @@ def submit_annotation(
 
     guard = WorkflowGuard()
     before_status = sentence.status
-    guard.ensure_transition(sentence.status, SentenceStatus.SUBMITTED, user.role)
+    guard.ensure_transition(sentence.status, SentenceStatus.SUBMITTED, user.acting_role)
     annotation = Annotation(
         sentence_id=sentence_id,
         assignment_id=assignment.id,
@@ -128,7 +128,7 @@ def submit_annotation(
     log_action(
         session,
         actor_id=user.user_id,
-        actor_role=user.role,
+        actor_role=user.acting_role,
         action="annotation_submitted",
         entity_type="sentence",
         entity_id=sentence.id,
@@ -156,11 +156,11 @@ def review_annotation(
     target_status = guard.review_to_target(payload.decision)
 
     if sentence.status == SentenceStatus.SUBMITTED:
-        guard.ensure_transition(sentence.status, SentenceStatus.IN_REVIEW, user.role)
+        guard.ensure_transition(sentence.status, SentenceStatus.IN_REVIEW, user.acting_role)
         sentence.status = SentenceStatus.IN_REVIEW
 
     if sentence.status != target_status:
-        guard.ensure_transition(sentence.status, target_status, user.role)
+        guard.ensure_transition(sentence.status, target_status, user.acting_role)
 
     annotation = session.get(Annotation, payload.annotation_id)
     if not annotation or annotation.sentence_id != sentence_id:
@@ -181,7 +181,7 @@ def review_annotation(
     log_action(
         session,
         actor_id=user.user_id,
-        actor_role=user.role,
+        actor_role=user.acting_role,
         action="review_recorded",
         entity_type="sentence",
         entity_id=sentence.id,
@@ -209,7 +209,7 @@ def adjudicate_sentence(
     user: CurrentUser = Depends(get_current_user),
 ) -> Adjudication:
     sentence = _get_sentence(session, sentence_id)
-    require_roles(user.role, {Role.ADMIN, Role.CURATOR})
+    require_roles(user, {Role.ADMIN, Role.CURATOR}, use_project_roles=True)
     before_status = sentence.status
     if sentence.status != SentenceStatus.IN_REVIEW:
         raise HTTPException(
@@ -217,7 +217,7 @@ def adjudicate_sentence(
             detail="Cümle curation/review aşamasında değil.",
         )
     guard = WorkflowGuard()
-    guard.ensure_transition(sentence.status, SentenceStatus.ADJUDICATED, user.role)
+    guard.ensure_transition(sentence.status, SentenceStatus.ADJUDICATED, user.acting_role)
 
     adjudication = Adjudication(
         sentence_id=sentence_id,
@@ -233,7 +233,7 @@ def adjudicate_sentence(
     log_action(
         session,
         actor_id=user.user_id,
-        actor_role=user.role,
+        actor_role=user.acting_role,
         action="adjudication_completed",
         entity_type="sentence",
         entity_id=sentence.id,
@@ -258,16 +258,16 @@ def accept_sentence(
     user: CurrentUser = Depends(get_current_user),
 ) -> Sentence:
     sentence = _get_sentence(session, sentence_id)
-    require_roles(user.role, {Role.ADMIN, Role.CURATOR})
+    require_roles(user, {Role.ADMIN, Role.CURATOR}, use_project_roles=True)
     guard = WorkflowGuard()
-    guard.ensure_transition(sentence.status, SentenceStatus.ACCEPTED, user.role)
+    guard.ensure_transition(sentence.status, SentenceStatus.ACCEPTED, user.acting_role)
     before_status = sentence.status
     sentence.status = SentenceStatus.ACCEPTED
     session.add(sentence)
     log_action(
         session,
         actor_id=user.user_id,
-        actor_role=user.role,
+        actor_role=user.acting_role,
         action="sentence_accepted",
         entity_type="sentence",
         entity_id=sentence.id,
@@ -288,21 +288,21 @@ def reopen_adjudication(
     user: CurrentUser = Depends(get_current_user),
 ) -> Sentence:
     sentence = _get_sentence(session, sentence_id)
-    require_roles(user.role, {Role.ADMIN, Role.CURATOR})
+    require_roles(user, {Role.ADMIN, Role.CURATOR}, use_project_roles=True)
     if sentence.status != SentenceStatus.ADJUDICATED:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Yalnızca adjudication sonrası cümleler yeniden açılabilir.",
         )
     guard = WorkflowGuard()
-    guard.ensure_transition(sentence.status, SentenceStatus.IN_REVIEW, user.role)
+    guard.ensure_transition(sentence.status, SentenceStatus.IN_REVIEW, user.acting_role)
     before_status = sentence.status
     sentence.status = SentenceStatus.IN_REVIEW
     session.add(sentence)
     log_action(
         session,
         actor_id=user.user_id,
-        actor_role=user.role,
+        actor_role=user.acting_role,
         action="adjudication_reopened",
         entity_type="sentence",
         entity_id=sentence.id,
@@ -317,6 +317,9 @@ def reopen_adjudication(
 
 
 @router.get("/project/{project_id}", response_model=list[Sentence])
-def list_sentences(project_id: int, session: Session = Depends(get_session)) -> list[Sentence]:
+def list_sentences(
+    project_id: int, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user)
+) -> list[Sentence]:
     _get_project(session, project_id)
+    require_roles(user, {Role.ADMIN, Role.CURATOR, Role.REVIEWER, Role.ANNOTATOR}, use_project_roles=True)
     return list(session.exec(select(Sentence).where(Sentence.project_id == project_id)))

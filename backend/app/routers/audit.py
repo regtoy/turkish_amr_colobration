@@ -33,7 +33,7 @@ def list_audit_logs(
     Admin users can access all logs, whereas curator users must filter by project_id.
     """
 
-    require_roles(user.role, {Role.ADMIN, Role.CURATOR})
+    require_roles(user, {Role.ADMIN, Role.CURATOR}, use_project_roles=True)
 
     if user.role == Role.CURATOR and project_id is None:
         raise HTTPException(
