@@ -3,7 +3,7 @@ from typing import Optional
 
 from sqlmodel import SQLModel
 
-from .enums import AssignmentStrategy, ReviewDecision, Role
+from .enums import AssignmentStrategy, ExportFormat, ExportLevel, JobStatus, PiiStrategy, ReviewDecision, Role
 from .models import AuditLog
 
 
@@ -115,3 +115,30 @@ class ProjectMembershipPublic(SQLModel):
     role: Role
     is_active: bool
     approved_at: Optional[datetime] = None
+
+
+class ExportRequestParams(SQLModel):
+    format: ExportFormat = ExportFormat.JSON
+    level: ExportLevel = ExportLevel.ALL
+    pii_strategy: PiiStrategy = PiiStrategy.ANONYMIZE
+
+
+class ExportJobCreate(SQLModel):
+    project_id: int
+    format: ExportFormat = ExportFormat.JSON
+    level: ExportLevel = ExportLevel.ALL
+    pii_strategy: PiiStrategy = PiiStrategy.ANONYMIZE
+
+
+class ExportJobPublic(SQLModel):
+    id: int
+    project_id: int
+    created_by: int
+    status: JobStatus
+    format: ExportFormat
+    level: ExportLevel
+    pii_strategy: PiiStrategy
+    result_path: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
