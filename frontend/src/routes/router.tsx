@@ -10,12 +10,22 @@ import { AnnotatorPage } from '@/pages/AnnotatorPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { PendingApprovalPage } from '@/pages/PendingApprovalPage'
+import { RegisterPage } from '@/pages/RegisterPage'
 import { ReviewerPage } from '@/pages/ReviewerPage'
 
 export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/register',
+    element: <RegisterPage />,
+  },
+  {
+    path: '/pending',
+    element: <PendingApprovalPage />,
   },
   {
     path: '/',

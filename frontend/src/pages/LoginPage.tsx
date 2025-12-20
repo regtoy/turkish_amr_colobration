@@ -1,7 +1,7 @@
-import { Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Link, Stack, TextField, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { type Location,Navigate, useLocation } from 'react-router-dom'
+import { Link as RouterLink, type Location, Navigate, useLocation } from 'react-router-dom'
 
 import { useAuthContext } from '@/auth/AuthProvider'
 import { Spinner } from '@/components/ui/Spinner'
@@ -13,9 +13,11 @@ export const LoginPage = () => {
   const location = useLocation()
   const { login, user, isLoading } = useAuthContext()
   const { showToast } = useToast()
-  const [credentials, setCredentials] = useState<LoginPayload>({ email: '', password: '' })
+  const [credentials, setCredentials] = useState<LoginPayload>({ username: '', password: '' })
+  const [errors, setErrors] = useState<{ username?: string; password?: string }>({})
 
   if (user) {
+    if (user.role === 'pending') return <Navigate to="/pending" replace />
     const redirectPath = (location.state as { from?: Location })?.from?.pathname ?? '/'
     return <Navigate to={redirectPath} replace />
   }
@@ -23,17 +25,33 @@ export const LoginPage = () => {
   const handleChange =
     (field: keyof LoginPayload) => (event: React.ChangeEvent<HTMLInputElement>) => {
       setCredentials((prev) => ({ ...prev, [field]: event.target.value }))
+      setErrors((prev) => ({ ...prev, [field]: undefined }))
     }
+
+  const validate = () => {
+    const nextErrors: typeof errors = {}
+    if (!credentials.username.trim()) {
+      nextErrors.username = t('validation.required')
+    }
+    if (!credentials.password.trim()) {
+      nextErrors.password = t('validation.required')
+    } else if (credentials.password.length < 6) {
+      nextErrors.password = t('validation.passwordLength')
+    }
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!validate()) return
 
     try {
       await login(credentials)
-      showToast('Başarıyla giriş yapıldı', { variant: 'success' })
+      showToast(t('pages.login.success'), { variant: 'success' })
     } catch (error) {
       console.error('Login failed', error)
-      showToast('Giriş başarısız. Bilgileri kontrol edin.', { variant: 'error' })
+      showToast(t('pages.login.error'), { variant: 'error' })
     }
   }
 
@@ -51,26 +69,37 @@ export const LoginPage = () => {
               </Typography>
             </Stack>
 
+            <Alert severity="info">{t('pages.login.helper')}</Alert>
+
             <TextField
-              label="E-posta"
-              type="email"
-              value={credentials.email}
-              onChange={handleChange('email')}
-              required
+              label={t('fields.username')}
+              type="text"
+              value={credentials.username}
+              onChange={handleChange('username')}
+              error={Boolean(errors.username)}
+              helperText={errors.username}
               fullWidth
             />
             <TextField
-              label="Şifre"
+              label={t('fields.password')}
               type="password"
               value={credentials.password}
               onChange={handleChange('password')}
-              required
+              error={Boolean(errors.password)}
+              helperText={errors.password}
               fullWidth
             />
 
             <Button type="submit" disabled={isLoading} size="large">
               {isLoading ? <Spinner label={t('status.loading')} /> : t('actions.login')}
             </Button>
+
+            <Typography textAlign="center" variant="body2">
+              {t('pages.login.registerCta')}{' '}
+              <Link component={RouterLink} to="/register" underline="hover">
+                {t('pages.login.registerLink')}
+              </Link>
+            </Typography>
           </Stack>
         </CardContent>
       </Card>
