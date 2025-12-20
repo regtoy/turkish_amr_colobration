@@ -3,7 +3,7 @@ from typing import Optional
 
 from sqlmodel import SQLModel
 
-from .enums import ReviewDecision, Role
+from .enums import AssignmentStrategy, ReviewDecision, Role
 from .models import AuditLog
 
 
@@ -23,7 +23,12 @@ class SentenceCreate(SQLModel):
 
 
 class AssignmentRequest(SQLModel):
-    user_id: int
+    assignee_ids: Optional[list[int]] = None
+    strategy: AssignmentStrategy = AssignmentStrategy.ROUND_ROBIN
+    count: int = 1
+    required_skills: Optional[list[str]] = None
+    allow_multiple_assignments: bool = False
+    reassign_after_reject: bool = False
     role: Role = Role.ANNOTATOR
     is_blind: bool = False
 
