@@ -2,9 +2,9 @@ import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 
 const metricItems = [
-  { key: 'tasks', labelKey: 'pages.dashboard.metrics.tasks', value: '24' },
-  { key: 'quality', labelKey: 'pages.dashboard.metrics.quality', value: '92%' },
-  { key: 'velocity', labelKey: 'pages.dashboard.metrics.velocity', value: '180' },
+  { key: 'tasks', label: 'Aktif görevler', value: '24' },
+  { key: 'quality', label: 'Ortalama kalite', value: '92%' },
+  { key: 'velocity', label: 'Günlük hız', value: '180 cümle' },
 ]
 
 export const DashboardPage = () => {
@@ -21,11 +21,10 @@ export const DashboardPage = () => {
           <Card key={metric.key}>
             <CardContent>
               <Typography variant="overline" color="text.secondary">
-                {t(metric.labelKey)}
+                {metric.label}
               </Typography>
               <Typography variant="h4" fontWeight={700} mt={1}>
                 {metric.value}
-                {metric.key === 'velocity' ? ` ${t('pages.dashboard.metrics.unit')}` : null}
               </Typography>
             </CardContent>
           </Card>
@@ -37,7 +36,9 @@ export const DashboardPage = () => {
           <Typography variant="h6" fontWeight={700} gutterBottom>
             {t('pages.dashboard.subtitle')}
           </Typography>
-          <Typography color="text.secondary">{t('pages.dashboard.description')}</Typography>
+          <Typography color="text.secondary">
+            Bu alan, kontrol paneli bileşenleri, grafikler ve veri tabloları için iskelet sağlar.
+          </Typography>
         </CardContent>
       </Card>
     </Stack>

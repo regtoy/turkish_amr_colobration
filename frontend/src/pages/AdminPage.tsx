@@ -13,18 +13,18 @@ import { useTranslation } from 'react-i18next'
 const adminItems = [
   {
     id: 'roles',
-    labelKey: 'pages.admin.items.roles.label',
-    descriptionKey: 'pages.admin.items.roles.description',
+    label: 'Rol yönetimi',
+    description: 'Rol tabanlı izinleri ve grupları yapılandırın.',
   },
   {
     id: 'projects',
-    labelKey: 'pages.admin.items.projects.label',
-    descriptionKey: 'pages.admin.items.projects.description',
+    label: 'Proje ayarları',
+    description: 'Yeni veri kümeleri, görevler ve iş akışları tanımlayın.',
   },
   {
     id: 'audit',
-    labelKey: 'pages.admin.items.audit.label',
-    descriptionKey: 'pages.admin.items.audit.description',
+    label: 'Denetim günlükleri',
+    description: 'Erişim ve aktivite loglarını gözden geçirin.',
   },
 ]
 
@@ -38,7 +38,9 @@ export const AdminPage = () => {
           <Typography variant="h6" fontWeight={700} gutterBottom>
             {t('pages.admin.subtitle')}
           </Typography>
-          <Typography color="text.secondary">{t('pages.admin.description')}</Typography>
+          <Typography color="text.secondary">
+            Yönetici araçları, sistem genelindeki ayarların kontrolünü sağlar.
+          </Typography>
         </CardContent>
       </Card>
 
@@ -47,7 +49,7 @@ export const AdminPage = () => {
           {adminItems.map((item, index) => (
             <div key={item.id}>
               <ListItem>
-                <ListItemText primary={t(item.labelKey)} secondary={t(item.descriptionKey)} />
+                <ListItemText primary={item.label} secondary={item.description} />
               </ListItem>
               {index < adminItems.length - 1 && <Divider component="li" />}
             </div>

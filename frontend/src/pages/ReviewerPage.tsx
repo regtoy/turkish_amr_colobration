@@ -20,7 +20,7 @@ export const ReviewerPage = () => {
               </Typography>
               <LinearProgress value={item.progress} variant="determinate" />
               <Typography variant="body2" color="text.secondary">
-                {t('pages.reviewer.progressLabel', { progress: item.progress })}
+                %{item.progress} tamamlandı
               </Typography>
             </Stack>
           </CardContent>
@@ -32,7 +32,9 @@ export const ReviewerPage = () => {
           <Typography variant="h6" fontWeight={700} gutterBottom>
             {t('pages.reviewer.subtitle')}
           </Typography>
-          <Typography color="text.secondary">{t('pages.reviewer.description')}</Typography>
+          <Typography color="text.secondary">
+            İnceleme denetimleri, kabul/red iş akışları ve kalite ölçümlerinin yer alacağı iskelet.
+          </Typography>
         </CardContent>
       </Card>
     </Stack>

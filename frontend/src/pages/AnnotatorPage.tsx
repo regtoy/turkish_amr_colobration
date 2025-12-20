@@ -2,8 +2,8 @@ import { Card, CardContent, Chip, Stack, Typography } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 
 const sampleQueue = [
-  { id: 'T-1201', title: 'Belge kümesi 12', statusKey: 'pages.annotator.queue.waiting' },
-  { id: 'T-1202', title: 'Diyalog 45', statusKey: 'pages.annotator.queue.inProgress' },
+  { id: 'T-1201', title: 'Belge kümesi 12', status: 'Beklemede' },
+  { id: 'T-1202', title: 'Diyalog 45', status: 'Devam ediyor' },
 ]
 
 export const AnnotatorPage = () => {
@@ -24,7 +24,7 @@ export const AnnotatorPage = () => {
                 {task.id}
               </Typography>
             </div>
-            <Chip label={t(task.statusKey)} color="primary" variant="outlined" />
+            <Chip label={task.status} color="primary" variant="outlined" />
           </CardContent>
         </Card>
       ))}
@@ -34,7 +34,10 @@ export const AnnotatorPage = () => {
           <Typography variant="h6" fontWeight={700} gutterBottom>
             {t('pages.annotator.subtitle')}
           </Typography>
-          <Typography color="text.secondary">{t('pages.annotator.description')}</Typography>
+          <Typography color="text.secondary">
+            Görev dağıtımı, form tabanlı anotasyon ve gönderim akışlarını burada
+            yapılandırabilirsiniz.
+          </Typography>
         </CardContent>
       </Card>
     </Stack>

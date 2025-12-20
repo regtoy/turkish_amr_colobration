@@ -3,7 +3,6 @@ import { safeStorage } from '@/utils/safeStorage'
 
 const TOKEN_KEY = 'turkish-amr.jwt'
 const USER_KEY = 'turkish-amr.user'
-export const AUTH_CLEARED_EVENT = 'auth:cleared'
 
 export const tokenStorage = {
   getToken(): string | null {
@@ -39,15 +38,4 @@ export const userStorage = {
     safeStorage.removeItem(USER_KEY)
     safeStorage.removeItem(TOKEN_KEY)
   },
-}
-
-const dispatchAuthCleared = () => {
-  if (typeof window === 'undefined') return
-  window.dispatchEvent(new Event(AUTH_CLEARED_EVENT))
-}
-
-export const clearAuthSession = () => {
-  tokenStorage.clearToken()
-  userStorage.clearUser()
-  dispatchAuthCleared()
 }

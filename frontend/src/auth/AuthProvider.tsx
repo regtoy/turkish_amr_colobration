@@ -1,12 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import { authApi } from '@/api/auth'
-import {
-  AUTH_CLEARED_EVENT,
-  clearAuthSession,
-  tokenStorage,
-  userStorage,
-} from '@/auth/tokenStorage'
+import { tokenStorage, userStorage } from '@/auth/tokenStorage'
 import type { AuthResponse, LoginPayload, Role, User } from '@/types/auth'
 
 interface AuthContextValue {
@@ -51,7 +46,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   )
 
   const logout = useCallback(() => {
-    clearAuthSession()
+    tokenStorage.clearToken()
+    userStorage.clearUser()
     setUser(null)
     setToken(null)
   }, [])
@@ -75,18 +71,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
     void bootstrapProfile()
   }, [token, user, logout])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    const handleAuthCleared = () => {
-      setUser(null)
-      setToken(null)
-    }
-
-    window.addEventListener(AUTH_CLEARED_EVENT, handleAuthCleared)
-    return () => window.removeEventListener(AUTH_CLEARED_EVENT, handleAuthCleared)
-  }, [])
 
   const hasRole = useCallback(
     (role: Role) => {

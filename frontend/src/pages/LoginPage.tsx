@@ -1,7 +1,7 @@
 import { Box, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { type Location, Navigate, useLocation } from 'react-router-dom'
+import { type Location,Navigate, useLocation } from 'react-router-dom'
 
 import { useAuthContext } from '@/auth/AuthProvider'
 import { Spinner } from '@/components/ui/Spinner'
@@ -30,10 +30,10 @@ export const LoginPage = () => {
 
     try {
       await login(credentials)
-      showToast(t('pages.login.toast.success'), { variant: 'success' })
+      showToast('Başarıyla giriş yapıldı', { variant: 'success' })
     } catch (error) {
       console.error('Login failed', error)
-      showToast(t('pages.login.toast.error'), { variant: 'error' })
+      showToast('Giriş başarısız. Bilgileri kontrol edin.', { variant: 'error' })
     }
   }
 
@@ -52,7 +52,7 @@ export const LoginPage = () => {
             </Stack>
 
             <TextField
-              label={t('forms.email')}
+              label="E-posta"
               type="email"
               value={credentials.email}
               onChange={handleChange('email')}
@@ -60,7 +60,7 @@ export const LoginPage = () => {
               fullWidth
             />
             <TextField
-              label={t('forms.password')}
+              label="Şifre"
               type="password"
               value={credentials.password}
               onChange={handleChange('password')}

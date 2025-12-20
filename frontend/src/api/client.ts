@@ -1,6 +1,6 @@
 import axios, { type AxiosRequestHeaders } from 'axios'
 
-import { clearAuthSession, tokenStorage } from '@/auth/tokenStorage'
+import { tokenStorage } from '@/auth/tokenStorage'
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -28,7 +28,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      clearAuthSession()
+      tokenStorage.clearToken()
     }
 
     return Promise.reject(error)
