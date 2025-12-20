@@ -16,6 +16,14 @@ uvicorn app.main:app --reload
 
 Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri `.env` dosyasıyla yönetilebilir (örn. `DATABASE_URL`, `DATABASE_ECHO`).
 
+### Kimlik doğrulama
+- **Kayıt:** `POST /auth/register` (username, password zorunlu; rol `pending` olarak başlar)
+- **Giriş:** `POST /auth/token` — `Authorization: Bearer <token>` header’ı ile sonraki isteklere eklenir.
+- **Me:** `GET /auth/me` — mevcut kullanıcının bilgilerini döner.
+- **Rol/aktiflik güncelleme:** `PATCH /auth/users/{user_id}/role` — yalnızca admin; rol veya `is_active` güncellenebilir.
+- **Konfig:** `SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` ortam değişkenleri `.env` üzerinden ayarlanabilir.
+- Geçiş sürecinde eski header tabanlı kimlik doğrulama (`X-User-Id`, `X-User-Role`) geriye dönük uyumluluk için korunmuştur.
+
 ## Örnek İstek Akışı
 1. **Proje oluştur** (admin): `POST /projects`
 2. **Cümle ekle** (admin): `POST /sentences/project/{project_id}`
@@ -26,7 +34,7 @@ Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri
 7. **Gold kabulü** (curator/admin): `POST /sentences/{sentence_id}/accept`
 8. **Adjudication yeniden aç** (curator/admin): `POST /sentences/{sentence_id}/reopen`
 
-Kimlik doğrulama yerinde “hafif” tutulmuştur: her isteğe `X-User-Id` ve `X-User-Role` header’ları eklenmelidir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır.
+Kimlik doğrulama artık JWT tabanlıdır; `Authorization: Bearer` header’ı taşınmalıdır. Geriye dönük olarak `X-User-Id` ve `X-User-Role` header’ları da desteklenir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır ve veritabanındaki kullanıcı kaydıyla tutarlı olmalıdır.
 
 ## Durum değerlendirme ve audit
 - **Proje özeti:** `GET /projects/{project_id}/summary` (admin/curator) — cümle durum dağılımı, atama ve değerlendirme sayıları.

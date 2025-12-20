@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from sqlmodel import SQLModel
@@ -65,3 +66,35 @@ class AuditLogPage(SQLModel):
     limit: int
     offset: int
     items: list[AuditLog]
+
+
+class UserCreate(SQLModel):
+    username: str
+    email: Optional[str] = None
+    password: str
+
+
+class UserLogin(SQLModel):
+    username: str
+    password: str
+
+
+class UserPublic(SQLModel):
+    id: int
+    username: str
+    email: Optional[str] = None
+    role: Role
+    is_active: bool
+    created_at: Optional[datetime] = None
+
+
+class TokenResponse(SQLModel):
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    role: Role
+
+
+class UserRoleUpdate(SQLModel):
+    role: Role
+    is_active: Optional[bool] = None
