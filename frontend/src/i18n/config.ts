@@ -55,7 +55,6 @@ const resources = {
           helper: 'Your account will remain pending until an administrator approves it.',
           success: 'Registration completed. Logging you in…',
           error: 'Registration failed. Please review the form details.',
-          loginError: 'Registration succeeded but auto-login failed. Please try signing in.',
           loginCta: 'Already have an account?',
         },
         pending: {
@@ -133,7 +132,6 @@ const resources = {
           helper: 'Hesabınız bir yönetici onaylayana kadar beklemede kalacaktır.',
           success: 'Kayıt tamamlandı. Giriş yapılıyor…',
           error: 'Kayıt başarısız. Lütfen bilgileri kontrol edin.',
-          loginError: 'Kayıt başarılı fakat otomatik giriş yapılamadı. Lütfen yeniden giriş yapın.',
           loginCta: 'Zaten hesabınız var mı?',
         },
         pending: {

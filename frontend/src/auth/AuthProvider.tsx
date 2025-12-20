@@ -57,7 +57,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       try {
         const data = await authApi.login(credentials)
         syncAuthState(data)
-        await refreshProfile()
+        const profile = await authApi.profile()
+        userStorage.saveUser(profile)
+        setUser(profile)
         return data
       } finally {
         setIsLoading(false)

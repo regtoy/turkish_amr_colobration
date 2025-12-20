@@ -24,12 +24,7 @@ export const userStorage = {
     try {
       const parsed = JSON.parse(raw) as Partial<User> & { roles?: string[] }
       if (!parsed.role && parsed.roles?.length) {
-        const priority: User['role'][] = ['admin', 'reviewer', 'annotator', 'curator', 'guest', 'pending']
-        const prioritized = priority.find((candidate) => parsed.roles?.includes(candidate))
-        if (parsed.roles.length > 1) {
-          console.warn('Multiple cached roles found; selecting role by priority', parsed.roles)
-        }
-        parsed.role = prioritized ?? (parsed.roles[0] as User['role'])
+        parsed.role = parsed.roles[0] as User['role']
       }
       if (parsed.is_active === undefined) {
         parsed.is_active = true

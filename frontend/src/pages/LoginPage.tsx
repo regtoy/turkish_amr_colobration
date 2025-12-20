@@ -31,12 +31,12 @@ export const LoginPage = () => {
 
   const validate = () => {
     const nextErrors: typeof errors = {}
-    if (!isRequired(credentials.username)) {
+    if (!credentials.username.trim()) {
       nextErrors.username = t('validation.required')
     }
-    if (!isRequired(credentials.password)) {
+    if (!credentials.password.trim()) {
       nextErrors.password = t('validation.required')
-    } else if (!isValidPasswordLength(credentials.password, 6)) {
+    } else if (credentials.password.length < 6) {
       nextErrors.password = t('validation.passwordLength')
     }
     setErrors(nextErrors)

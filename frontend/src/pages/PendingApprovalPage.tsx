@@ -15,9 +15,6 @@ export const PendingApprovalPage = () => {
   if (!user) {
     return <Navigate to="/login" replace />
   }
-  if (user.role !== 'pending') {
-    return <Navigate to="/" replace />
-  }
 
   const handleRetry = async () => {
     const profile = await refreshProfile()

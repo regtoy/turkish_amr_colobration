@@ -104,7 +104,26 @@ async def get_current_user_allow_pending(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     session: Session = Depends(get_session),
 ) -> User:
-    user, _ = _get_user_from_token(credentials, session)
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Kimlik doğrulama bilgileri sağlanmadı",
+        )
+
+    payload = decode_access_token(credentials.credentials)
+    try:
+        user_id = int(payload["sub"])
+        role = Role(payload["role"])
+    except (KeyError, TypeError, ValueError) as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token yükü geçersiz") from exc
+
+    user = session.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kullanıcı aktif değil veya bulunamadı")
+
+    if user.role != role:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Rol bilgisi ile kullanıcı eşleşmiyor")
+
     return user
 
 

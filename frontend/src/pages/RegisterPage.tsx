@@ -8,7 +8,6 @@ import { useAuthContext } from '@/auth/AuthProvider'
 import { Spinner } from '@/components/ui/Spinner'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { RegisterPayload } from '@/types/auth'
-import { isRequired, isValidEmail, isValidPasswordLength } from '@/validation/authValidation'
 
 export const RegisterPage = () => {
   const { t } = useTranslation()
@@ -34,11 +33,12 @@ export const RegisterPage = () => {
 
   const validate = () => {
     const nextErrors: typeof errors = {}
-    if (!isRequired(form.username)) nextErrors.username = t('validation.required')
-    if (form.email && !isValidEmail(form.email)) nextErrors.email = t('validation.email')
-    if (!isRequired(form.password)) {
+    if (!form.username.trim()) nextErrors.username = t('validation.required')
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+      nextErrors.email = t('validation.email')
+    if (!form.password.trim()) {
       nextErrors.password = t('validation.required')
-    } else if (!isValidPasswordLength(form.password, 6)) {
+    } else if (form.password.length < 6) {
       nextErrors.password = t('validation.passwordLength')
     }
     setErrors(nextErrors)
@@ -52,18 +52,10 @@ export const RegisterPage = () => {
     try {
       await authApi.register(form)
       showToast(t('pages.register.success'), { variant: 'success' })
+      await login({ username: form.username, password: form.password })
     } catch (error) {
       console.error('Registration failed', error)
       showToast(t('pages.register.error'), { variant: 'error' })
-      setIsSubmitting(false)
-      return
-    }
-
-    try {
-      await login({ username: form.username, password: form.password })
-    } catch (error) {
-      console.error('Auto-login failed after registration', error)
-      showToast(t('pages.register.loginError'), { variant: 'warning' })
     } finally {
       setIsSubmitting(false)
     }
