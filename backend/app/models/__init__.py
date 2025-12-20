@@ -7,6 +7,7 @@ from .project import Project
 from .membership import ProjectMembership
 from .review import Review
 from .sentence import Sentence
+from .user_profile import UserProfile
 from .user import User
 
 __all__ = [
@@ -19,5 +20,6 @@ __all__ = [
     "Project",
     "Review",
     "Sentence",
+    "UserProfile",
     "User",
 ]

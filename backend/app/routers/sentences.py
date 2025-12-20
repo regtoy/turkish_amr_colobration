@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 from ..database import get_session
 from ..dependencies import CurrentUser, get_current_user
-from ..enums import ReviewDecision, Role, SentenceStatus
+from ..enums import AssignmentStrategy, ReviewDecision, Role, SentenceStatus
 from ..models import Adjudication, Annotation, Assignment, FailedSubmission, Project, Review, Sentence
 from ..schemas import (
     AdjudicationSubmit,
@@ -15,6 +15,7 @@ from ..schemas import (
     ReviewSubmit,
     SentenceCreate,
 )
+from ..services.assignment_engine import AssignmentEngine
 from ..services.audit import log_action
 from ..services.validation import ValidationService
 from ..services.workflow import WorkflowGuard, require_roles
@@ -70,6 +71,23 @@ def _record_failed_submission(
     return failure
 
 
+def _deactivate_assignments(
+    session: Session,
+    sentence_id: int,
+    assignment_ids: Optional[set[int]] = None,
+) -> list[int]:
+    query = select(Assignment).where(Assignment.sentence_id == sentence_id, Assignment.is_active.is_(True))
+    if assignment_ids:
+        query = query.where(Assignment.id.in_(assignment_ids))
+    assignments = session.exec(query).all()
+    deactivated_ids: list[int] = []
+    for assignment in assignments:
+        assignment.is_active = False
+        session.add(assignment)
+        deactivated_ids.append(assignment.id)
+    return deactivated_ids
+
+
 @router.post("/project/{project_id}", response_model=Sentence, status_code=status.HTTP_201_CREATED)
 def create_sentence(
     project_id: int,
@@ -99,20 +117,67 @@ def create_sentence(
     return sentence
 
 
-@router.post("/{sentence_id}/assign", response_model=Assignment)
+@router.post("/{sentence_id}/assign", response_model=list[Assignment])
 def assign_sentence(
     sentence_id: int,
     payload: AssignmentRequest,
     session: Session = Depends(get_session),
     user: CurrentUser = Depends(get_current_user),
-) -> Assignment:
+) -> list[Assignment]:
     sentence = _get_sentence(session, sentence_id)
     guard = WorkflowGuard()
     before_status = sentence.status
+    active_assignments = session.exec(
+        select(Assignment).where(Assignment.sentence_id == sentence_id, Assignment.is_active.is_(True))
+    ).all()
+    guard.ensure_assignment_allowed(
+        status=sentence.status,
+        has_active_assignments=bool(active_assignments),
+        allow_multiple_assignments=payload.allow_multiple_assignments,
+        allow_reassignment=payload.reassign_after_reject,
+    )
+
+    deactivated_assignments: list[int] = []
+    if payload.reassign_after_reject:
+        has_rejection = (
+            session.exec(
+                select(Review.id)
+                .join(Annotation, Annotation.id == Review.annotation_id)
+                .where(Annotation.sentence_id == sentence_id, Review.decision == ReviewDecision.REJECT)
+            ).first()
+            is not None
+        )
+        guard.require_rejection_for_reassignment(has_rejection=has_rejection)
+        deactivated_assignments = _deactivate_assignments(session, sentence_id)
+        active_assignments = []
+
     guard.ensure_transition(sentence.status, SentenceStatus.ASSIGNED, user.acting_role)
-    assignment = Assignment(sentence_id=sentence_id, **payload.dict())
+    requested_count = payload.count if payload.assignee_ids is None else len(payload.assignee_ids)
+    if requested_count < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Atanacak kullanıcı sayısı belirtilmeli.")
+    assignment_engine = AssignmentEngine(session)
+    existing_assignees = {assignment.user_id for assignment in active_assignments}
+    assignee_ids = assignment_engine.select_assignees(
+        project_id=sentence.project_id,
+        strategy=payload.strategy,
+        role=payload.role,
+        count=requested_count,
+        required_skills=payload.required_skills,
+        provided_assignees=payload.assignee_ids,
+        exclude_user_ids=existing_assignees,
+    )
+    assignments: list[Assignment] = []
+    for assignee_id in assignee_ids:
+        assignment = Assignment(
+            sentence_id=sentence_id,
+            user_id=assignee_id,
+            role=payload.role,
+            is_blind=payload.is_blind,
+        )
+        assignments.append(assignment)
+        session.add(assignment)
+
     sentence.status = SentenceStatus.ASSIGNED
-    session.add(assignment)
     session.add(sentence)
     session.flush()
     log_action(
@@ -125,11 +190,23 @@ def assign_sentence(
         before_status=before_status,
         after_status=SentenceStatus.ASSIGNED,
         project_id=sentence.project_id,
-        metadata={"assignment_id": assignment.id, "assignee_role": payload.role.value, "is_blind": payload.is_blind},
+        metadata={
+            "assignment_ids": [assignment.id for assignment in assignments],
+            "assignee_ids": assignee_ids,
+            "assignee_role": payload.role.value,
+            "strategy": payload.strategy.value if isinstance(payload.strategy, AssignmentStrategy) else payload.strategy,
+            "requested_count": requested_count,
+            "is_blind": payload.is_blind,
+            "required_skills": payload.required_skills,
+            "allow_multiple_assignments": payload.allow_multiple_assignments,
+            "reassign_after_reject": payload.reassign_after_reject,
+            "deactivated_assignment_ids": deactivated_assignments,
+        },
     )
     session.commit()
-    session.refresh(assignment)
-    return assignment
+    for assignment in assignments:
+        session.refresh(assignment)
+    return assignments
 
 
 @router.post("/{sentence_id}/submit", response_model=Annotation, status_code=status.HTTP_201_CREATED)
@@ -143,7 +220,9 @@ def submit_annotation(
     project = _get_project(session, sentence.project_id)
     assignment = session.exec(
         select(Assignment).where(
-            Assignment.sentence_id == sentence_id, Assignment.user_id == user.user_id
+            Assignment.sentence_id == sentence_id,
+            Assignment.user_id == user.user_id,
+            Assignment.is_active.is_(True),
         )
     ).first()
     if not assignment:
@@ -232,6 +311,14 @@ def review_annotation(
     if not annotation or annotation.sentence_id != sentence_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz anotasyon")
 
+    deactivated_assignment_ids: set[int] = set()
+    if guard.should_close_assignment_for_review(payload.decision):
+        deactivated_assignment_ids.update(
+            _deactivate_assignments(session, sentence_id, {annotation.assignment_id})
+        )
+    if guard.should_lock_assignments_for_target(target_status):
+        deactivated_assignment_ids.update(_deactivate_assignments(session, sentence_id))
+
     review = Review(
         annotation_id=payload.annotation_id,
         reviewer_id=user.user_id,
@@ -279,6 +366,7 @@ def review_annotation(
             "decision": payload.decision.value,
             "score": payload.score,
             "is_multi_annotator": payload.is_multi_annotator,
+            "deactivated_assignment_ids": sorted(deactivated_assignment_ids),
         },
     )
     session.commit()
@@ -311,6 +399,7 @@ def adjudicate_sentence(
         decision_note=payload.decision_note,
         source_annotation_ids=payload.source_annotation_ids,
     )
+    deactivated_assignment_ids = _deactivate_assignments(session, sentence_id)
     sentence.status = SentenceStatus.ADJUDICATED
     session.add(adjudication)
     session.add(sentence)
@@ -329,6 +418,7 @@ def adjudicate_sentence(
             "adjudication_id": adjudication.id,
             "decision_note": payload.decision_note,
             "source_annotation_ids": payload.source_annotation_ids,
+            "deactivated_assignment_ids": deactivated_assignment_ids,
         },
     )
     session.commit()
@@ -347,6 +437,7 @@ def accept_sentence(
     guard = WorkflowGuard()
     guard.ensure_transition(sentence.status, SentenceStatus.ACCEPTED, user.acting_role)
     before_status = sentence.status
+    deactivated_assignment_ids = _deactivate_assignments(session, sentence_id)
     sentence.status = SentenceStatus.ACCEPTED
     session.add(sentence)
     log_action(
@@ -359,6 +450,7 @@ def accept_sentence(
         before_status=before_status,
         after_status=SentenceStatus.ACCEPTED,
         project_id=sentence.project_id,
+        metadata={"deactivated_assignment_ids": deactivated_assignment_ids},
     )
     session.commit()
     session.refresh(sentence)

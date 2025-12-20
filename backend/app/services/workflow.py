@@ -11,9 +11,13 @@ class WorkflowGuard:
 
     _transitions: dict[SentenceStatus, dict[SentenceStatus, Set[Role]]] = {
         SentenceStatus.NEW: {SentenceStatus.ASSIGNED: {Role.ADMIN, Role.ASSIGNMENT_ENGINE, Role.CURATOR}},
-        SentenceStatus.ASSIGNED: {SentenceStatus.SUBMITTED: {Role.ANNOTATOR}},
+        SentenceStatus.ASSIGNED: {
+            SentenceStatus.ASSIGNED: {Role.ADMIN, Role.ASSIGNMENT_ENGINE, Role.CURATOR},
+            SentenceStatus.SUBMITTED: {Role.ANNOTATOR},
+        },
         SentenceStatus.SUBMITTED: {SentenceStatus.IN_REVIEW: {Role.ADMIN, Role.REVIEWER, Role.CURATOR}},
         SentenceStatus.IN_REVIEW: {
+            SentenceStatus.IN_REVIEW: {Role.REVIEWER, Role.ADMIN, Role.CURATOR},
             SentenceStatus.ADJUDICATED: {Role.REVIEWER, Role.ADMIN, Role.CURATOR},
             SentenceStatus.SUBMITTED: {Role.REVIEWER},
             SentenceStatus.ASSIGNED: {Role.REVIEWER, Role.ADMIN, Role.CURATOR},
@@ -21,6 +25,7 @@ class WorkflowGuard:
         SentenceStatus.ADJUDICATED: {
             SentenceStatus.ACCEPTED: {Role.ADMIN, Role.CURATOR},
             SentenceStatus.IN_REVIEW: {Role.ADMIN, Role.CURATOR},
+            SentenceStatus.ADJUDICATED: {Role.ADMIN, Role.CURATOR},
         },
     }
 
@@ -49,6 +54,41 @@ class WorkflowGuard:
         if decision == ReviewDecision.REJECT:
             return SentenceStatus.ASSIGNED
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz review kararı")
+
+    def ensure_assignment_allowed(
+        self,
+        *,
+        status: SentenceStatus,
+        has_active_assignments: bool,
+        allow_multiple_assignments: bool,
+        allow_reassignment: bool,
+    ) -> None:
+        if status not in {SentenceStatus.NEW, SentenceStatus.ASSIGNED}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Bu durumdayken yeni atama yapılamaz.",
+            )
+        if has_active_assignments and not (allow_multiple_assignments or allow_reassignment):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Aktif atamalar varken yeni atama için izin gerekli.",
+            )
+
+    @staticmethod
+    def require_rejection_for_reassignment(*, has_rejection: bool) -> None:
+        if not has_rejection:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Reject kararı olmadan yeniden atama yapılamaz.",
+            )
+
+    @staticmethod
+    def should_close_assignment_for_review(decision: ReviewDecision) -> bool:
+        return decision in {ReviewDecision.APPROVE, ReviewDecision.REJECT}
+
+    @staticmethod
+    def should_lock_assignments_for_target(target: SentenceStatus) -> bool:
+        return target in {SentenceStatus.IN_REVIEW, SentenceStatus.ADJUDICATED, SentenceStatus.ACCEPTED}
 
 
 def require_roles(user: CurrentUser, allowed: Iterable[Role], *, use_project_roles: bool = False) -> Role:
