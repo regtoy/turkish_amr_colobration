@@ -30,9 +30,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ title, subtitle, child
     { key: 'admin', label: t('layout.admin'), to: '/admin', roles: ['admin'] },
   ]
 
-  const allowedNavItems = navItems.filter(
-    (item) => !item.roles?.length || item.roles.some((role) => user?.roles.includes(role)),
-  )
+  const allowedNavItems = navItems.filter((item) => !item.roles?.length || item.roles.includes(user?.role as Role))
 
   const isActivePath = (path: string) => {
     if (path === '/') return location.pathname === '/'

@@ -22,7 +22,14 @@ export const userStorage = {
     if (!raw) return null
 
     try {
-      return JSON.parse(raw) as User
+      const parsed = JSON.parse(raw) as Partial<User> & { roles?: string[] }
+      if (!parsed.role && parsed.roles?.length) {
+        parsed.role = parsed.roles[0] as User['role']
+      }
+      if (parsed.is_active === undefined) {
+        parsed.is_active = true
+      }
+      return parsed as User
     } catch (error) {
       console.warn('Unable to parse cached user', error)
       return null

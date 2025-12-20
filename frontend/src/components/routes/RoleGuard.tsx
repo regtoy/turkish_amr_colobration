@@ -23,7 +23,11 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles, children }) 
     return <Navigate to="/login" replace state={{ from: location }} />
   }
 
-  if (allowedRoles && !allowedRoles.some((role) => user.roles.includes(role))) {
+  if (user.role === 'pending') {
+    return <Navigate to="/pending" replace />
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />
   }
 
