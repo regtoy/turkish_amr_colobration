@@ -27,6 +27,7 @@ export const LayoutShell: React.FC<LayoutShellProps> = ({ title, subtitle, child
     { key: 'dashboard', label: t('layout.dashboard'), to: '/' },
     { key: 'annotator', label: t('layout.annotator'), to: '/annotator', roles: ['annotator'] },
     { key: 'reviewer', label: t('layout.reviewer'), to: '/reviewer', roles: ['reviewer'] },
+    { key: 'curator', label: t('layout.curator'), to: '/curator', roles: ['curator'] },
     { key: 'admin', label: t('layout.admin'), to: '/admin', roles: ['admin'] },
   ]
 

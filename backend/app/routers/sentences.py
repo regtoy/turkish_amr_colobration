@@ -14,6 +14,7 @@ from ..schemas import (
     ReopenRequest,
     ReviewSubmit,
     SentenceCreate,
+    ValidationRequest,
 )
 from ..services.assignment_engine import AssignmentEngine
 from ..services.audit import log_action
@@ -293,6 +294,25 @@ def submit_annotation(
     return annotation
 
 
+@router.post("/{sentence_id}/validate")
+def validate_penman(
+    sentence_id: int,
+    payload: ValidationRequest,
+    session: Session = Depends(get_session),
+    user: CurrentUser = Depends(get_current_user),
+) -> dict[str, Any]:
+    sentence = _get_sentence(session, sentence_id)
+    project = _get_project(session, sentence.project_id)
+    require_roles(user, {Role.ADMIN, Role.CURATOR, Role.REVIEWER, Role.ANNOTATOR}, use_project_roles=True)
+    validator = ValidationService(
+        amr_version=project.amr_version,
+        role_set_version=project.role_set_version,
+        rule_version=project.validation_rule_version,
+    )
+    report = validator.validate(payload.penman_text)
+    return report.to_dict()
+
+
 @router.post("/{sentence_id}/review", response_model=Sentence)
 def review_annotation(
     sentence_id: int,
@@ -498,6 +518,54 @@ def reopen_adjudication(
     session.commit()
     session.refresh(sentence)
     return sentence
+
+
+@router.get("/{sentence_id}", response_model=Sentence)
+def get_sentence(
+    sentence_id: int, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user)
+) -> Sentence:
+    sentence = _get_sentence(session, sentence_id)
+    require_roles(user, {Role.ADMIN, Role.CURATOR, Role.REVIEWER, Role.ANNOTATOR}, use_project_roles=True)
+    return sentence
+
+
+@router.get("/{sentence_id}/annotations", response_model=list[Annotation])
+def list_annotations(
+    sentence_id: int, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user)
+) -> list[Annotation]:
+    sentence = _get_sentence(session, sentence_id)
+    require_roles(user, {Role.ADMIN, Role.CURATOR, Role.REVIEWER, Role.ANNOTATOR}, use_project_roles=True)
+    return list(session.exec(select(Annotation).where(Annotation.sentence_id == sentence.id)))
+
+
+@router.get("/{sentence_id}/reviews", response_model=list[Review])
+def list_reviews(
+    sentence_id: int, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user)
+) -> list[Review]:
+    sentence = _get_sentence(session, sentence_id)
+    require_roles(user, {Role.ADMIN, Role.CURATOR, Role.REVIEWER}, use_project_roles=True)
+    return list(
+        session.exec(
+            select(Review)
+            .join(Annotation, Annotation.id == Review.annotation_id)
+            .where(Annotation.sentence_id == sentence.id)
+            .order_by(Review.created_at.desc())
+        )
+    )
+
+
+@router.get("/{sentence_id}/adjudication", response_model=Optional[Adjudication])
+def get_adjudication(
+    sentence_id: int, session: Session = Depends(get_session), user: CurrentUser = Depends(get_current_user)
+) -> Optional[Adjudication]:
+    sentence = _get_sentence(session, sentence_id)
+    require_roles(user, {Role.ADMIN, Role.CURATOR}, use_project_roles=True)
+    return session.exec(
+        select(Adjudication)
+        .where(Adjudication.sentence_id == sentence.id)
+        .order_by(Adjudication.created_at.desc())
+        .limit(1)
+    ).first()
 
 
 @router.get("/project/{project_id}", response_model=list[Sentence])

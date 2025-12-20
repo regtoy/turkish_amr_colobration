@@ -38,6 +38,10 @@ class AnnotationSubmit(SQLModel):
     validity_report: Optional[str] = None
 
 
+class ValidationRequest(SQLModel):
+    penman_text: str
+
+
 class ReviewSubmit(SQLModel):
     annotation_id: int
     decision: ReviewDecision
