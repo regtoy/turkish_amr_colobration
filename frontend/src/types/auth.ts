@@ -1,14 +1,28 @@
-export type Role = 'annotator' | 'reviewer' | 'admin'
+export type Role =
+  | 'guest'
+  | 'pending'
+  | 'annotator'
+  | 'reviewer'
+  | 'curator'
+  | 'admin'
+  | 'assignment_engine'
 
 export interface User {
-  id: string
-  email: string
-  name: string
-  roles: Role[]
+  id: number
+  username: string
+  email?: string | null
+  role: Role
+  is_active: boolean
 }
 
 export interface LoginPayload {
-  email: string
+  username: string
+  password: string
+}
+
+export interface RegisterPayload {
+  username: string
+  email?: string
   password: string
 }
 
@@ -17,6 +31,5 @@ export interface AuthTokens {
 }
 
 export interface AuthResponse {
-  user: User
   token: AuthTokens
 }

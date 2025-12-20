@@ -10,7 +10,7 @@ from ..models import User
 from ..schemas import TokenResponse, UserCreate, UserLogin, UserPublic
 from ..services.audit import log_action
 from ..services.security import create_access_token, hash_password, verify_password
-from ..dependencies import admin_user, CurrentUser
+from ..dependencies import CurrentUser, admin_user, get_current_user_allow_pending
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,6 +47,11 @@ def login_user(payload: UserLogin, session: Session = Depends(get_session)) -> T
         expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
     )
     return TokenResponse(access_token=access_token, token_type="bearer", user_id=user.id, role=user.role)
+
+
+@router.get("/me", response_model=UserPublic)
+def me(current_user: User = Depends(get_current_user_allow_pending)) -> UserPublic:
+    return current_user
 
 
 @router.get("/pending", response_model=list[UserPublic])

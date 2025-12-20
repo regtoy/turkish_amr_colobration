@@ -11,6 +11,7 @@ interface AuthContextValue {
   hasRole: (role: Role) => boolean
   login: (credentials: LoginPayload) => Promise<AuthResponse>
   logout: () => void
+  refreshProfile: () => Promise<User | null>
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
@@ -22,28 +23,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
   const syncAuthState = useCallback((payload: AuthResponse) => {
     const nextToken = payload.token.accessToken
-    const nextUser = payload.user
-
     tokenStorage.saveToken(nextToken)
-    userStorage.saveUser(nextUser)
-
     setToken(nextToken)
-    setUser(nextUser)
   }, [])
-
-  const login = useCallback(
-    async (credentials: LoginPayload) => {
-      setIsLoading(true)
-      try {
-        const data = await authApi.login(credentials)
-        syncAuthState(data)
-        return data
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [syncAuthState],
-  )
 
   const logout = useCallback(() => {
     tokenStorage.clearToken()
@@ -52,15 +34,45 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     setToken(null)
   }, [])
 
+  const refreshProfile = useCallback(async () => {
+    if (!token) return null
+    setIsLoading(true)
+    try {
+      const profile = await authApi.profile()
+      userStorage.saveUser(profile)
+      setUser(profile)
+      return profile
+    } catch (error) {
+      console.error('Failed to refresh profile', error)
+      logout()
+      return null
+    } finally {
+      setIsLoading(false)
+    }
+  }, [logout, token])
+
+  const login = useCallback(
+    async (credentials: LoginPayload) => {
+      setIsLoading(true)
+      try {
+        const data = await authApi.login(credentials)
+        syncAuthState(data)
+        await refreshProfile()
+        return data
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [syncAuthState, refreshProfile],
+  )
+
   useEffect(() => {
     const bootstrapProfile = async () => {
       if (!token || user) return
 
       setIsLoading(true)
       try {
-        const profile = await authApi.profile()
-        userStorage.saveUser(profile)
-        setUser(profile)
+        await refreshProfile()
       } catch (error) {
         console.error('Failed to bootstrap profile', error)
         logout()
@@ -70,12 +82,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     }
 
     void bootstrapProfile()
-  }, [token, user, logout])
+  }, [token, user, logout, refreshProfile])
 
   const hasRole = useCallback(
     (role: Role) => {
       if (!user) return false
-      return user.roles.includes(role)
+      return user.role === role
     },
     [user],
   )
@@ -88,8 +100,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       logout,
       hasRole,
       isLoading,
+      refreshProfile,
     }),
-    [user, token, login, logout, hasRole, isLoading],
+    [user, token, login, logout, hasRole, isLoading, refreshProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
