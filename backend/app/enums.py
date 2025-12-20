@@ -29,3 +29,29 @@ class ReviewDecision(str, Enum):
     APPROVE = "approve"
     NEEDS_FIX = "needs_fix"
     REJECT = "reject"
+
+
+class ExportFormat(str, Enum):
+    JSON = "json"
+    MANIFEST_JSON = "manifest+json"
+
+
+class ExportLevel(str, Enum):
+    GOLD = "gold"
+    SILVER = "silver"
+    ALL = "all"
+    FAILED = "failed"
+    REJECTED = "rejected"
+
+
+class PiiStrategy(str, Enum):
+    INCLUDE = "include"
+    ANONYMIZE = "anonymize"
+    STRIP = "strip"
+
+
+class JobStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
