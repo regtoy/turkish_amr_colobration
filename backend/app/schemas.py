@@ -85,7 +85,6 @@ class UserPublic(SQLModel):
     email: Optional[str] = None
     role: Role
     is_active: bool
-    created_at: Optional[datetime] = None
 
 
 class TokenResponse(SQLModel):
@@ -93,8 +92,3 @@ class TokenResponse(SQLModel):
     token_type: str = "bearer"
     user_id: int
     role: Role
-
-
-class UserRoleUpdate(SQLModel):
-    role: Role
-    is_active: Optional[bool] = None

@@ -3,11 +3,9 @@ from typing import Optional
 
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlmodel import Session
 
 from .database import get_session
 from .enums import Role
-from .models import User
 from .services.security import decode_access_token
 
 
@@ -22,7 +20,6 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    session: Session = Depends(get_session),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     x_user_id: Optional[str] = Header(default=None, alias="X-User-Id"),
     x_user_role: Optional[str] = Header(default=None, alias="X-User-Role"),
@@ -34,10 +31,7 @@ async def get_current_user(
             role = Role(payload["role"])
         except (KeyError, TypeError, ValueError) as exc:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token yükü geçersiz") from exc
-        user = session.get(User, user_id)
-        if not user or not user.is_active:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kullanıcı aktif değil veya bulunamadı")
-        return CurrentUser(user_id=user.id, role=user.role)
+        return CurrentUser(user_id=user_id, role=role)
 
     if x_user_id is None or x_user_role is None:
         raise HTTPException(
