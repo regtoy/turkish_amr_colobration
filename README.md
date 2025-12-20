@@ -32,7 +32,7 @@ Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri
 7. **Gold kabulü** (curator/admin): `POST /sentences/{sentence_id}/accept`
 8. **Adjudication yeniden aç** (curator/admin): `POST /sentences/{sentence_id}/reopen`
 
-Kimlik doğrulama yerinde “hafif” tutulmuştur: her isteğe `X-User-Id` ve `X-User-Role` header’ları eklenmelidir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır.
+Kimlik doğrulama artık JWT tabanlıdır; `Authorization: Bearer` header’ı taşınmalıdır. Geriye dönük olarak `X-User-Id` ve `X-User-Role` header’ları da desteklenir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır ve veritabanındaki kullanıcı kaydıyla tutarlı olmalıdır.
 
 ## Durum değerlendirme ve audit
 - **Proje özeti:** `GET /projects/{project_id}/summary` (admin/curator) — cümle durum dağılımı, atama ve değerlendirme sayıları.

@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from .database import get_session
 from .enums import Role
 from .services.security import decode_access_token
 
@@ -46,7 +47,14 @@ async def get_current_user(
     except ValueError as exc:  # pragma: no cover - defensive
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Geçersiz rol") from exc
 
-    return CurrentUser(user_id=user_id, role=role)
+    user = session.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kullanıcı aktif değil veya bulunamadı")
+
+    if user.role != role:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Rol bilgisi ile kullanıcı eşleşmiyor")
+
+    return CurrentUser(user_id=user.id, role=user.role)
 
 
 def admin_user(user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
