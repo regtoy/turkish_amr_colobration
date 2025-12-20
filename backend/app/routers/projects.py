@@ -76,7 +76,7 @@ def project_summary(
     assignment_rows = session.exec(
         select(Assignment.role, func.count())
         .join(Sentence, Sentence.id == Assignment.sentence_id)
-        .where(Sentence.project_id == project_id)
+        .where(Sentence.project_id == project_id, Assignment.is_active.is_(True))
         .group_by(Assignment.role)
     ).all()
     for role, count in assignment_rows:

@@ -11,6 +11,11 @@ class Role(str, Enum):
     ASSIGNMENT_ENGINE = "assignment_engine"
 
 
+class AssignmentStrategy(str, Enum):
+    ROUND_ROBIN = "round_robin"
+    SKILL_BASED = "skill_based"
+
+
 class SentenceStatus(str, Enum):
     NEW = "NEW"
     ASSIGNED = "ASSIGNED"
