@@ -19,8 +19,6 @@ Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri
 ### Kimlik doğrulama
 - **Kayıt:** `POST /auth/register` (username, password zorunlu; rol `pending` olarak başlar)
 - **Giriş:** `POST /auth/token` — `Authorization: Bearer <token>` header’ı ile sonraki isteklere eklenir.
-- **Me:** `GET /auth/me` — mevcut kullanıcının bilgilerini döner.
-- **Rol/aktiflik güncelleme:** `PATCH /auth/users/{user_id}/role` — yalnızca admin; rol veya `is_active` güncellenebilir.
 - **Konfig:** `SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` ortam değişkenleri `.env` üzerinden ayarlanabilir.
 - Geçiş sürecinde eski header tabanlı kimlik doğrulama (`X-User-Id`, `X-User-Role`) geriye dönük uyumluluk için korunmuştur.
 
