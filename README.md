@@ -16,6 +16,14 @@ uvicorn app.main:app --reload
 
 Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri `.env` dosyasıyla yönetilebilir (örn. `DATABASE_URL`, `DATABASE_ECHO`).
 
+### Kimlik doğrulama
+- **Kayıt:** `POST /auth/register` (username, password zorunlu; rol `pending` olarak başlar)
+- **Giriş:** `POST /auth/token` — `Authorization: Bearer <token>` header’ı ile sonraki isteklere eklenir.
+- **Me:** `GET /auth/me` — mevcut kullanıcının bilgilerini döner.
+- **Rol/aktiflik güncelleme:** `PATCH /auth/users/{user_id}/role` — yalnızca admin; rol veya `is_active` güncellenebilir.
+- **Konfig:** `SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` ortam değişkenleri `.env` üzerinden ayarlanabilir.
+- Geçiş sürecinde eski header tabanlı kimlik doğrulama (`X-User-Id`, `X-User-Role`) geriye dönük uyumluluk için korunmuştur.
+
 ## Örnek İstek Akışı
 1. **Proje oluştur** (admin): `POST /projects`
 2. **Cümle ekle** (admin): `POST /sentences/project/{project_id}`
@@ -26,12 +34,22 @@ Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri
 7. **Gold kabulü** (curator/admin): `POST /sentences/{sentence_id}/accept`
 8. **Adjudication yeniden aç** (curator/admin): `POST /sentences/{sentence_id}/reopen`
 
-Kimlik doğrulama yerinde “hafif” tutulmuştur: her isteğe `X-User-Id` ve `X-User-Role` header’ları eklenmelidir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır.
+Kimlik doğrulama artık JWT tabanlıdır; `Authorization: Bearer` header’ı taşınmalıdır. Geriye dönük olarak `X-User-Id` ve `X-User-Role` header’ları da desteklenir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır ve veritabanındaki kullanıcı kaydıyla tutarlı olmalıdır.
 
 ## Durum değerlendirme ve audit
 - **Proje özeti:** `GET /projects/{project_id}/summary` (admin/curator) — cümle durum dağılımı, atama ve değerlendirme sayıları.
 - **Audit kayıtları:** `GET /audit?project_id=...&limit=50&offset=0` (admin tüm kayıtlar, curator proje filtresi ile) — aksiyon bazlı audit log erişimi ve filtreleme. Sayfalama için `limit` (max 200) ve `offset` parametreleri kullanılabilir.
 - **Audit kayıtları:** `GET /audit?project_id=...` (admin tüm kayıtlar, curator proje filtresi ile) — aksiyon bazlı audit log erişimi ve filtreleme.
+
+## Frontend yol haritası (ilk adımlar)
+1. **Kimlik doğrulama kabuğu:** Login/registration formları, token saklama (HTTP-only cookie veya memory), `Authorization: Bearer` header ekleyen API istemcisi, oturum yenileme/çıkış akışı. Geriye dönük header desteği için dev panel seçeneği.
+2. **Rol tabanlı yönlendirme:** Admin, annotator, reviewer vb. için route guard ve layout seviyesinde yetki kontrolleri; `/auth/me` ile kullanıcı bilgisini senkronize et.
+3. **Proje ve görev listesi:** Proje seçimi, cümle listeleri (status filtreli), atama/rolleri gösteren tablo; pagination ve boş durum ekranları.
+4. **Annotator workspace (MVP):** Cümle metni + PENMAN editor placeholder, yer tutucu validasyon çıktıları; sunucudan dönen validity_report için uyarı alanı.
+5. **Reviewer/curator ekranları (taslak):** Çoklu anotasyon listesi/diff placeholder’ları, karar butonları; backend `review` ve `adjudicate` endpoint’lerine bağlanacak mock akış.
+6. **UI temel bileşenleri:** Bildirim/toast sistemi, doğrulama uyarıları, yükleme durumları, form doğrulama helper’ları; i18n yapılandırması.
+7. **API istemci katmanı:** Typing’li endpoint wrapper’ları (OpenAPI spec’ten üretilmiş veya el ile), hata haritalama (401→login yönlendirme, 403→uyarı, 422→form hataları).
+8. **Test ve kalite:** UI bileşenleri için component testleri (örn. Vitest/React Testing Library) ve smoke e2e senaryoları; lint/format kuralları (ESLint/Prettier).
 
 ## Sonraki Adımlar
 - JWT tabanlı gerçek kimlik doğrulama ve kullanıcı yönetimi.
