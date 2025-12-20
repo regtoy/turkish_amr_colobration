@@ -180,6 +180,13 @@ def assign_sentence(
     sentence.status = SentenceStatus.ASSIGNED
     session.add(sentence)
     session.flush()
+    metadata = _assignment_log_metadata(
+        assignments=assignments,
+        assignee_ids=assignee_ids,
+        payload=payload,
+        requested_count=requested_count,
+        deactivated_assignment_ids=deactivated_assignments,
+    )
     log_action(
         session,
         actor_id=user.user_id,
