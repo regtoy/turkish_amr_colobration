@@ -2,11 +2,13 @@ import { createBrowserRouter } from 'react-router-dom'
 
 import { AdminLayout } from '@/components/layouts/AdminLayout'
 import { AnnotatorLayout } from '@/components/layouts/AnnotatorLayout'
+import { CuratorLayout } from '@/components/layouts/CuratorLayout'
 import { DashboardLayout } from '@/components/layouts/DashboardLayout'
 import { ReviewerLayout } from '@/components/layouts/ReviewerLayout'
 import { RoleGuard } from '@/components/routes/RoleGuard'
 import { AdminPage } from '@/pages/AdminPage'
 import { AnnotatorPage } from '@/pages/AnnotatorPage'
+import { CuratorPage } from '@/pages/CuratorPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -53,6 +55,15 @@ export const router = createBrowserRouter([
           </RoleGuard>
         ),
         children: [{ index: true, element: <ReviewerPage /> }],
+      },
+      {
+        path: 'curator',
+        element: (
+          <RoleGuard allowedRoles={['curator']}>
+            <CuratorLayout />
+          </RoleGuard>
+        ),
+        children: [{ index: true, element: <CuratorPage /> }],
       },
       {
         path: 'admin',
