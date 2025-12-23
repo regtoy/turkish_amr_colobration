@@ -46,6 +46,7 @@ const assignmentOptions = [
   { value: 'reviewer', labelKey: 'pages.dashboard.assignmentLabels.reviewer' },
   { value: 'curator', labelKey: 'pages.dashboard.assignmentLabels.curator' },
   { value: 'admin', labelKey: 'pages.dashboard.assignmentLabels.admin' },
+  { value: 'assignment_engine', labelKey: 'pages.dashboard.assignmentLabels.assignment_engine' },
 ]
 
 const actionPermissions: Record<TaskAction, Role[]> = {
