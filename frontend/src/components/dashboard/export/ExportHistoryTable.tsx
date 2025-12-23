@@ -75,7 +75,16 @@ export const ExportHistoryTable: React.FC<ExportHistoryTableProps> = ({ items, e
                       İndir
                     </Link>
                   )}
-                  {item.resultPath && !item.localUrl && <Box color="text.secondary">{item.resultPath}</Box>}
+                  {item.downloadUrl && (
+                    <Link href={item.downloadUrl} underline="hover" target="_blank" rel="noreferrer">
+                      Job indir
+                    </Link>
+                  )}
+                  {item.resultPath && (
+                    <Box color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+                      {item.resultPath}
+                    </Box>
+                  )}
                 </Stack>
               </TableCell>
             </TableRow>

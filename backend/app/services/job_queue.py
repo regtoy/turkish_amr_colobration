@@ -22,6 +22,9 @@ class ExportJobQueue:
         format: ExportFormat,
         pii_strategy: PiiStrategy,
         filters: Optional[dict[str, str]] = None,
+        include_manifest: bool = True,
+        include_failed: bool = False,
+        include_rejected: bool = False,
     ) -> ExportJob:
         job = ExportJob(
             project_id=project_id,
@@ -30,6 +33,9 @@ class ExportJobQueue:
             format=format,
             pii_strategy=pii_strategy,
             filters=filters,
+            include_manifest=include_manifest,
+            include_failed=include_failed,
+            include_rejected=include_rejected,
             status=JobStatus.QUEUED,
         )
         self.session.add(job)

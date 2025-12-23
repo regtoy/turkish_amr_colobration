@@ -8,7 +8,7 @@ from sqlmodel import Session, SQLModel, select
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))
+    sys.path.insert(0, str(ROOT))
 
 from app.database import engine, get_session  # noqa: E402
 from app.dependencies import CurrentUser, get_current_user  # noqa: E402

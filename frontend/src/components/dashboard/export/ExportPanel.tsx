@@ -55,7 +55,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ projectId }) => {
     try {
       const payload = await exportsApi.requestExport(projectId, {
         projectId,
-        format: 'json',
+        format: values.format,
         level: values.level,
         piiStrategy: values.piiStrategy,
         includeManifest: true,
@@ -114,9 +114,12 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ projectId }) => {
     try {
       const job = await exportsApi.createJob(projectId, {
         projectId,
-        format: 'json',
+        format: values.format,
         level: values.level,
         piiStrategy: values.piiStrategy,
+        includeManifest: values.format === 'manifest+json',
+        includeFailed: values.includeFailed,
+        includeRejected: values.includeRejected,
       })
       const entry = toHistoryEntry(job)
       addHistory(entry)

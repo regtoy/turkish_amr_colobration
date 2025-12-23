@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable
+from pathlib import Path
+from zipfile import ZipFile
 
 from sqlmodel import Session, select
 
@@ -151,6 +154,55 @@ class ExportService:
             "failed_submissions": failed,
             "manifest": manifest,
         }
+
+    def write_export_file(
+        self,
+        payload: dict,
+        request: ExportRequest,
+        *,
+        directory: Path,
+        job_id: int | None = None,
+    ) -> str:
+        directory.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        base_name = f"project-{payload['project_id']}-{request.level.value}"
+        if job_id:
+            base_name += f"-job-{job_id}"
+        base_name += f"-{timestamp}"
+
+        if request.format == ExportFormat.JSON:
+            path = directory / f"{base_name}.json"
+            with path.open("w", encoding="utf-8") as fp:
+                json.dump(payload, fp, ensure_ascii=False, indent=2)
+            return str(path)
+
+        if request.format == ExportFormat.MANIFEST_JSON:
+            archive_path = directory / f"{base_name}.zip"
+            with tempfile.TemporaryDirectory() as tmpdir:
+                temp_dir = Path(tmpdir)
+                data_payload = {
+                    "project_id": payload.get("project_id"),
+                    "exported_at": payload.get("exported_at"),
+                    "records": payload.get("records", []),
+                    "failed_submissions": payload.get("failed_submissions", []),
+                }
+                data_path = temp_dir / "data.json"
+                with data_path.open("w", encoding="utf-8") as fp:
+                    json.dump(data_payload, fp, ensure_ascii=False, indent=2)
+
+                manifest = payload.get("manifest")
+                if manifest:
+                    manifest_path = temp_dir / "manifest.json"
+                    with manifest_path.open("w", encoding="utf-8") as fp:
+                        json.dump(manifest, fp, ensure_ascii=False, indent=2)
+                with ZipFile(archive_path, "w") as archive:
+                    archive.write(data_path, arcname="data.json")
+                    manifest_file = temp_dir / "manifest.json"
+                    if manifest_file.exists():
+                        archive.write(manifest_file, arcname="manifest.json")
+            return str(archive_path)
+
+        raise ExportValidationError(f"Desteklenmeyen export formatı: {request.format}")
 
     def _fetch_sentences(self, project_id: int, level: ExportLevel) -> list[Sentence]:
         query = select(Sentence).where(Sentence.project_id == project_id)

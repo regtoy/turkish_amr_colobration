@@ -132,6 +132,9 @@ class ExportJobCreate(SQLModel):
     format: ExportFormat = ExportFormat.JSON
     level: ExportLevel = ExportLevel.ALL
     pii_strategy: PiiStrategy = PiiStrategy.ANONYMIZE
+    include_manifest: bool = True
+    include_failed: bool = False
+    include_rejected: bool = False
 
 
 class ExportJobPublic(SQLModel):
@@ -142,6 +145,9 @@ class ExportJobPublic(SQLModel):
     format: ExportFormat
     level: ExportLevel
     pii_strategy: PiiStrategy
+    include_manifest: bool
+    include_failed: bool
+    include_rejected: bool
     result_path: Optional[str] = None
     error_message: Optional[str] = None
     created_at: datetime
