@@ -266,26 +266,33 @@ export const CuratorPage = () => {
                     </Grid>
                   ))}
                 </Grid>
-                {reviewsQuery.data?.length ? (
-                  <>
-                    <Divider />
-                    <Stack spacing={1}>
-                      <Typography variant="subtitle2" fontWeight={700}>
-                        {t('pages.reviewer.previousReviews')}
-                      </Typography>
-                      <Stack direction="row" spacing={1} flexWrap="wrap">
-                        {reviewsQuery.data.map((review) => (
-                          <Chip
-                            key={review.id}
-                            label={`#${review.id} • ${review.decision} • ${review.score ?? '-'}`}
-                            variant="outlined"
-                            color="primary"
-                          />
-                        ))}
-                      </Stack>
-                    </Stack>
-                  </>
-                ) : null}
+                <Divider />
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    {t('pages.reviewer.previousReviews')}
+                  </Typography>
+                  {reviewsQuery.isLoading && <Spinner label={t('status.loading')} />}
+                  {reviewsQuery.isError && (
+                    <Alert severity="error">
+                      {t('pages.curator.fetchError', { error: parseError(reviewsQuery.error) })}
+                    </Alert>
+                  )}
+                  {!reviewsQuery.isLoading && !reviewsQuery.isError && !reviewsQuery.data?.length ? (
+                    <Typography color="text.secondary">
+                      {t('pages.reviewer.noReviews', { defaultValue: 'Bu cümle için inceleme bulunmuyor.' })}
+                    </Typography>
+                  ) : null}
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    {reviewsQuery.data?.map((review) => (
+                      <Chip
+                        key={review.id}
+                        label={`#${review.id} • ${review.decision} • ${review.score ?? '-'}`}
+                        variant="outlined"
+                        color="primary"
+                      />
+                    ))}
+                  </Stack>
+                </Stack>
               </Stack>
             </CardContent>
           </Card>
@@ -356,16 +363,60 @@ export const CuratorPage = () => {
                   </Stack>
                 }
               />
-              {adjudicationQuery.data && (
-                <Box mt={2}>
+              <Divider sx={{ my: 2 }} />
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle2" fontWeight={700}>
+                  {t('pages.curator.lastAdjudication', {
+                    defaultValue: 'Önceki adjudication',
+                    id: adjudicationQuery.data?.id ?? '',
+                    curator: adjudicationQuery.data?.curatorId ?? '',
+                  })}
+                </Typography>
+                {adjudicationQuery.isLoading && <Spinner label={t('status.loading')} />}
+                {adjudicationQuery.isError && (
+                  <Alert severity="error">
+                    {t('pages.curator.adjudicateError', { error: parseError(adjudicationQuery.error) })}
+                  </Alert>
+                )}
+                {!adjudicationQuery.isLoading && !adjudicationQuery.isError && !adjudicationQuery.data && (
                   <Alert severity="info">
-                    {t('pages.curator.lastAdjudication', {
-                      id: adjudicationQuery.data.id,
-                      curator: adjudicationQuery.data.curatorId,
+                    {t('pages.reviewer.noAdjudication', {
+                      defaultValue: 'Bu cümle için adjudication kaydı bulunamadı.',
                     })}
                   </Alert>
-                </Box>
-              )}
+                )}
+                {adjudicationQuery.data && (
+                  <Stack spacing={1}>
+                    <Alert severity="info">
+                      {t('pages.curator.lastAdjudication', {
+                        id: adjudicationQuery.data.id,
+                        curator: adjudicationQuery.data.curatorId,
+                      })}
+                    </Alert>
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                      {adjudicationQuery.data.sourceAnnotationIds?.map((id) => (
+                        <Chip key={id} size="small" label={`#${id}`} variant="outlined" />
+                      ))}
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      {t('pages.reviewer.finalPenmanPreview', { defaultValue: 'Son PENMAN' })}
+                    </Typography>
+                    <Box
+                      component="pre"
+                      sx={{
+                        backgroundColor: 'grey.100',
+                        p: 1,
+                        borderRadius: 1,
+                        whiteSpace: 'pre-wrap',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      {adjudicationQuery.data.finalPenman}
+                    </Box>
+                  </Stack>
+                )}
+              </Stack>
             </CardContent>
           </Card>
         </Stack>
