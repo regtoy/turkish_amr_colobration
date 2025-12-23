@@ -1,4 +1,5 @@
-import { Card, CardContent, Chip, Divider, Grid2 as Grid, Skeleton, Stack, Typography } from '@mui/material'
+import { Card, CardContent, Chip, Divider, Skeleton, Stack, Typography } from '@mui/material'
+import Grid from '@mui/material/GridLegacy'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -42,7 +43,7 @@ export const ProjectSummaryCards: React.FC<ProjectSummaryCardsProps> = ({ summar
     return (
       <Grid container spacing={2}>
         {Array.from({ length: 3 }).map((_, idx) => (
-          <Grid key={idx} size={{ xs: 12, md: 4 }}>
+          <Grid key={idx} item xs={12} md={4}>
             <Card variant="outlined">
               <CardContent>
                 <Skeleton width="60%" />
@@ -73,7 +74,7 @@ export const ProjectSummaryCards: React.FC<ProjectSummaryCardsProps> = ({ summar
 
   return (
     <Grid container spacing={2}>
-      <Grid size={{ xs: 12, md: 4 }}>
+      <Grid item xs={12} md={4}>
         <Card variant="outlined">
           <CardContent>
             <Stack spacing={1}>
@@ -97,7 +98,7 @@ export const ProjectSummaryCards: React.FC<ProjectSummaryCardsProps> = ({ summar
         </Card>
       </Grid>
 
-      <Grid size={{ xs: 12, md: 4 }}>
+      <Grid item xs={12} md={4}>
         <Card variant="outlined">
           <CardContent>
             <Stack spacing={1.5}>
@@ -127,7 +128,7 @@ export const ProjectSummaryCards: React.FC<ProjectSummaryCardsProps> = ({ summar
         </Card>
       </Grid>
 
-      <Grid size={{ xs: 12, md: 4 }}>
+      <Grid item xs={12} md={4}>
         <Card variant="outlined">
           <CardContent>
             <Stack spacing={1.5}>
