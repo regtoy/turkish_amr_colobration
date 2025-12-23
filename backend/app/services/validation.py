@@ -2,9 +2,10 @@ import json
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Sequence
+from typing import Any, Callable, Iterable, Literal, Sequence
 
 import penman
+from penman.codec import PENMANCodec
 from penman.exceptions import DecodeError
 
 
@@ -12,10 +13,11 @@ from penman.exceptions import DecodeError
 class ValidationIssue:
     code: str
     message: str
+    severity: Literal["error", "warning", "lint"] = "error"
     context: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        payload: dict[str, Any] = {"code": self.code, "message": self.message}
+        payload: dict[str, Any] = {"code": self.code, "message": self.message, "severity": self.severity}
         if self.context:
             payload["context"] = self.context
         return payload
@@ -27,6 +29,7 @@ class ValidationReport:
     amr_version: str
     role_set_version: str
     rule_version: str
+    triple_count: int | None = None
     canonical_penman: str | None = None
     errors: list[ValidationIssue] = field(default_factory=list)
     warnings: list[ValidationIssue] = field(default_factory=list)
@@ -37,6 +40,7 @@ class ValidationReport:
             "amr_version": self.amr_version,
             "role_set_version": self.role_set_version,
             "rule_version": self.rule_version,
+            "triple_count": self.triple_count,
             "canonical_penman": self.canonical_penman,
             "errors": [issue.to_dict() for issue in self.errors],
             "warnings": [issue.to_dict() for issue in self.warnings],
@@ -52,12 +56,14 @@ class ValidationService:
         self.role_set_version = role_set_version
         self.rule_version = rule_version
         self._allowed_roles = self._build_allowed_roles(role_set_version)
+        self._codec = PENMANCodec()
         self._modular_checks: Sequence[
             tuple[str, Callable[[penman.Graph, str], tuple[list[ValidationIssue], list[ValidationIssue]]]]
         ] = (
             ("root", self._check_root),
             ("variables", self._check_variable_consistency),
             ("reentrancy", self._check_reentrancy),
+            ("triple_count", self._check_triple_count),
             ("triple_roles", self._check_roles),
             ("lint", self._lint_warnings),
         )
@@ -69,12 +75,12 @@ class ValidationService:
         warnings: list[ValidationIssue] = []
 
         if not normalized:
-            errors.append(ValidationIssue(code="empty_input", message="AMR içeriği boş olamaz."))
-            return self._report(errors, warnings, canonical_penman=None)
+            errors.append(ValidationIssue(code="empty_input", message="AMR içeriği boş olamaz.", severity="error"))
+            return self._report(errors, warnings, canonical_penman=None, triple_count=None)
 
         if not self._parentheses_balanced(normalized):
-            errors.append(ValidationIssue(code="parse_error", message="Parantez dengesi hatalı."))
-            return self._report(errors, warnings, canonical_penman=None)
+            errors.append(ValidationIssue(code="parse_error", message="Parantez dengesi hatalı.", severity="error"))
+            return self._report(errors, warnings, canonical_penman=None, triple_count=None)
 
         graph: penman.Graph | None = None
         try:
@@ -84,10 +90,11 @@ class ValidationService:
                 ValidationIssue(
                     code="parse_error",
                     message="PENMAN çözümleme hatası.",
+                    severity="error",
                     context={"detail": str(exc)},
                 )
             )
-            return self._report(errors, warnings, canonical_penman=None)
+            return self._report(errors, warnings, canonical_penman=None, triple_count=None)
 
         for _, check in self._modular_checks:
             check_errors, check_warnings = check(graph, original_text)
@@ -95,10 +102,16 @@ class ValidationService:
             warnings.extend(check_warnings)
 
         canonical_penman = self._canonicalize(graph)
-        return self._report(errors, warnings, canonical_penman=canonical_penman)
+        triple_count = len(graph.triples)
+        return self._report(errors, warnings, canonical_penman=canonical_penman, triple_count=triple_count)
 
     def _report(
-        self, errors: Iterable[ValidationIssue], warnings: Iterable[ValidationIssue], canonical_penman: str | None
+        self,
+        errors: Iterable[ValidationIssue],
+        warnings: Iterable[ValidationIssue],
+        *,
+        canonical_penman: str | None,
+        triple_count: int | None,
     ) -> ValidationReport:
         errors_list = list(errors)
         warnings_list = list(warnings)
@@ -108,6 +121,7 @@ class ValidationService:
             role_set_version=self.role_set_version,
             rule_version=self.rule_version,
             canonical_penman=canonical_penman,
+            triple_count=triple_count,
             errors=errors_list,
             warnings=warnings_list,
         )
@@ -158,14 +172,16 @@ class ValidationService:
         return base_roles
 
     def _canonicalize(self, graph: penman.Graph) -> str:
-        return penman.encode(graph, indent=None)
+        return self._codec.encode(graph, indent=None)
 
     def _check_root(self, graph: penman.Graph, _: str) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
         errors: list[ValidationIssue] = []
         warnings: list[ValidationIssue] = []
         root = graph.top
         if not root:
-            errors.append(ValidationIssue(code="missing_root", message="Kök düğüm tespit edilemedi."))
+            errors.append(
+                ValidationIssue(code="missing_root", message="Kök düğüm tespit edilemedi.", severity="error")
+            )
             return errors, warnings
         instances = {var: concept for var, _, concept in graph.instances()}
         if root not in instances:
@@ -173,6 +189,7 @@ class ValidationService:
                 ValidationIssue(
                     code="uninstantiated_root",
                     message="Kök düğüm için kavram bulunamadı.",
+                    severity="error",
                     context={"root": root},
                 )
             )
@@ -193,6 +210,7 @@ class ValidationService:
                     ValidationIssue(
                         code="invalid_variable_name",
                         message="Geçersiz değişken adı.",
+                        severity="error",
                         context={"variable": var},
                     )
                 )
@@ -205,6 +223,7 @@ class ValidationService:
                 ValidationIssue(
                     code="conflicting_instances",
                     message="Aynı değişken birden fazla kavramla eşlenmiş.",
+                    severity="error",
                     context={"variable": var, "existing": previous, "conflict": current},
                 )
             )
@@ -220,6 +239,7 @@ class ValidationService:
                 ValidationIssue(
                     code="dangling_variable",
                     message="Tanımlanmayan değişkene referans var.",
+                    severity="error",
                     context={"variables": dangling},
                 )
             )
@@ -229,6 +249,7 @@ class ValidationService:
                 ValidationIssue(
                     code="no_instances",
                     message="Hiçbir düğümde kavram tanımı bulunamadı.",
+                    severity="warning",
                 )
             )
         return errors, warnings
@@ -249,7 +270,33 @@ class ValidationService:
                 ValidationIssue(
                     code="reentrancy",
                     message="Düğüm birden fazla üstten bağ alıyor.",
+                    severity="warning",
                     context={"variable": node, "incoming_edges": count},
+                )
+            )
+        return errors, warnings
+
+    def _check_triple_count(self, graph: penman.Graph, _: str) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
+        errors: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
+        triple_count = len(graph.triples)
+        if triple_count == 0:
+            errors.append(
+                ValidationIssue(
+                    code="no_triples",
+                    message="Graf içinde üçleme bulunamadı.",
+                    severity="error",
+                )
+            )
+            return errors, warnings
+
+        instance_count = len(graph.instances())
+        if instance_count == 0:
+            warnings.append(
+                ValidationIssue(
+                    code="no_instance_triples",
+                    message="Herhangi bir :instance üçlemesi tespit edilmedi.",
+                    severity="warning",
                 )
             )
         return errors, warnings
@@ -270,6 +317,7 @@ class ValidationService:
                 ValidationIssue(
                     code="role_mismatch",
                     message="İzin verilmeyen PropBank rol(ler) kullanılmış.",
+                    severity="error",
                     context={"roles": disallowed_roles, "role_set_version": self.role_set_version},
                 )
             )
@@ -278,6 +326,7 @@ class ValidationService:
                 ValidationIssue(
                     code="no_roles_detected",
                     message="AMR içinde PropBank rolü tespit edilemedi.",
+                    severity="warning",
                 )
             )
         return errors, warnings
@@ -300,6 +349,7 @@ class ValidationService:
                     ValidationIssue(
                         code="duplicate_roles",
                         message="Aynı düğüm için yinelenen roller mevcut.",
+                        severity="lint",
                         context={"variable": source, "roles": sorted(problematic.keys())},
                     )
                 )
@@ -309,6 +359,7 @@ class ValidationService:
                 ValidationIssue(
                     code="leading_trailing_whitespace",
                     message="Başta/sonda gereksiz boşluklar bulundu, kanonize edildi.",
+                    severity="lint",
                 )
             )
 

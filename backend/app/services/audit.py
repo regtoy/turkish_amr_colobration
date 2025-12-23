@@ -64,6 +64,6 @@ def log_action(
         before_status=_normalize_status(before_status),
         after_status=_normalize_status(after_status),
         project_id=project_id,
-        metadata=_normalize_metadata(metadata),
+        meta=_normalize_metadata(metadata),
     )
     session.add(entry)

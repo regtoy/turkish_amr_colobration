@@ -11,7 +11,8 @@ dependencies = [
     "pydantic-settings>=2.6.1",
     "python-jose>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
-    "penman>=1.4.1"
+    "penman==1.3.1",
+    "httpx>=0.27.2"
 ]
 
 [build-system]
