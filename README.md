@@ -58,6 +58,8 @@ Kimlik doğrulama artık JWT tabanlıdır; `Authorization: Bearer` header’ı t
    SECRET_KEY=changeme
    DATABASE_URL=sqlite:///./amr.db  # replace with postgres URL if needed
    DATABASE_ECHO=false
+   ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+   CORS_ALLOW_CREDENTIALS=true
    EOF
    uvicorn app.main:app --reload --port 8000
    ```

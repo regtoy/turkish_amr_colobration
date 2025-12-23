@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -12,6 +13,8 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    allowed_origins: List[str] = ["*"]
+    cors_allow_credentials: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
