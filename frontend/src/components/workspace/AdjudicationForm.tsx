@@ -43,6 +43,7 @@ export const AdjudicationForm = ({
 }: AdjudicationFormProps) => {
   const primarySource = annotations.find((annotation) => annotation.id === selectedSourceIds[0])
   const secondarySource = annotations.find((annotation) => annotation.id === selectedSourceIds[1])
+  const sourceSummary = selectedSourceIds.length ? selectedSourceIds.join(', ') : 'Seçilmedi'
 
   return (
     <Stack spacing={2}>
@@ -52,6 +53,19 @@ export const AdjudicationForm = ({
         </Typography>
         <Chip label={`Kaynak: ${selectedSourceIds.length}`} variant="outlined" />
       </Stack>
+
+      <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+        <Chip size="small" label={`source_annotation_ids: ${sourceSummary}`} variant="outlined" />
+        <Chip
+          size="small"
+          label={`final_penman: ${finalPenman.trim().length ? `${finalPenman.trim().length} karakter` : 'boş'}`}
+          variant="outlined"
+          color={finalPenman.trim().length ? 'primary' : 'default'}
+        />
+      </Stack>
+      <Typography variant="body2" color="text.secondary">
+        Kaynak seçimi source_annotation_ids olarak, düzenlediğiniz grafik ise final_penman alanı olarak kaydedilir.
+      </Typography>
 
       <Stack direction="row" spacing={1} flexWrap="wrap">
         {annotations.map((annotation) => {

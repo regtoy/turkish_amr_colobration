@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
@@ -16,7 +17,7 @@ import {
 } from '@mui/material'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { queryKeys } from '@/api/queryKeys'
@@ -135,25 +136,6 @@ export const ReviewerPage = () => {
     setCompareMode('annotation')
     setSentenceId(numeric)
   }
-
-  const renderReviewHistory = useMemo(() => {
-    if (!reviewsQuery.data?.length) return null
-    return (
-      <Stack spacing={1}>
-        <Typography variant="subtitle2" fontWeight={700}>
-          {t('pages.reviewer.previousReviews')}
-        </Typography>
-        {reviewsQuery.data.map((review) => (
-          <Chip
-            key={review.id}
-            label={`#${review.id} • ${review.decision} • ${review.score ?? '-'}`}
-            variant="outlined"
-            color="primary"
-          />
-        ))}
-      </Stack>
-    )
-  }, [reviewsQuery.data, t])
 
   return (
     <Stack spacing={3}>
@@ -315,7 +297,78 @@ export const ReviewerPage = () => {
                     defaultValue: 'Karşılaştırma için anotasyon veya adjudication seçin.',
                   })}
                 />
-                {renderReviewHistory}
+                <Divider />
+                <Stack spacing={1}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    {t('pages.reviewer.previousReviews', { defaultValue: 'Önceki incelemeler' })}
+                  </Typography>
+                  {reviewsQuery.isLoading && <Spinner label={t('status.loading')} />}
+                  {reviewsQuery.isError && (
+                    <Alert severity="error">
+                      {t('pages.reviewer.fetchError', { error: parseError(reviewsQuery.error) })}
+                    </Alert>
+                  )}
+                  {!reviewsQuery.isLoading && !reviewsQuery.isError && !reviewsQuery.data?.length ? (
+                    <Typography color="text.secondary">
+                      {t('pages.reviewer.noReviews', { defaultValue: 'Bu cümle için inceleme bulunmuyor.' })}
+                    </Typography>
+                  ) : null}
+                  <Stack direction="row" spacing={1} flexWrap="wrap">
+                    {reviewsQuery.data?.map((review) => (
+                      <Chip
+                        key={review.id}
+                        label={`#${review.id} • ${review.decision} • ${review.score ?? '-'}`}
+                        variant="outlined"
+                        color="primary"
+                      />
+                    ))}
+                  </Stack>
+                </Stack>
+                <Divider />
+                <Stack spacing={1.5}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    {t('pages.reviewer.adjudicationSummary', { defaultValue: 'Adjudication özeti' })}
+                  </Typography>
+                  {adjudicationQuery.isLoading && <Spinner label={t('status.loading')} />}
+                  {adjudicationQuery.isError && (
+                    <Alert severity="error">
+                      {t('pages.reviewer.fetchError', { error: parseError(adjudicationQuery.error) })}
+                    </Alert>
+                  )}
+                  {!adjudicationQuery.isLoading && !adjudicationQuery.isError && !adjudicationQuery.data && (
+                    <Alert severity="info">
+                      {t('pages.reviewer.noAdjudication', {
+                        defaultValue: 'Bu cümle için henüz adjudication kaydı yok.',
+                      })}
+                    </Alert>
+                  )}
+                  {adjudicationQuery.data && (
+                    <Stack spacing={1}>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+                        <Chip color="primary" variant="outlined" label={`Adjudication #${adjudicationQuery.data.id}`} />
+                        {adjudicationQuery.data.sourceAnnotationIds?.map((id) => (
+                          <Chip key={id} size="small" label={`#${id}`} variant="outlined" />
+                        ))}
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {t('pages.reviewer.finalPenmanPreview', { defaultValue: 'Son PENMAN' })}
+                      </Typography>
+                      <Box
+                        component="pre"
+                        sx={{
+                          backgroundColor: 'grey.100',
+                          p: 1,
+                          borderRadius: 1,
+                          whiteSpace: 'pre-wrap',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      >
+                        {adjudicationQuery.data.finalPenman}
+                      </Box>
+                    </Stack>
+                  )}
+                </Stack>
               </Stack>
             </CardContent>
           </Card>

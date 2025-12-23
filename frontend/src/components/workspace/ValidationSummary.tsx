@@ -1,4 +1,4 @@
-import { Alert, Chip, Divider, Stack, Typography } from '@mui/material'
+import { Alert, Box, Chip, Divider, Stack, Typography } from '@mui/material'
 
 import type { ValidationReport } from '@/types/validation'
 
@@ -52,8 +52,39 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
           variant="outlined"
         />
       </Stack>
+      <Stack direction="row" spacing={1} flexWrap="wrap">
+        {report.amrVersion && <Chip size="small" label={`AMR ${report.amrVersion}`} variant="outlined" />}
+        {report.roleSetVersion && <Chip size="small" label={`Roleset ${report.roleSetVersion}`} variant="outlined" />}
+        {report.ruleVersion && <Chip size="small" label={`Kural ${report.ruleVersion}`} variant="outlined" />}
+        {report.errors.length > 0 && (
+          <Chip size="small" label={`${report.errors.length} hata`} color="error" variant="outlined" />
+        )}
+        {report.warnings.length > 0 && (
+          <Chip size="small" label={`${report.warnings.length} uyarı`} color="warning" variant="outlined" />
+        )}
+      </Stack>
       {report.canonicalPenman && (
-        <Alert severity="info">Normalize: {report.canonicalPenman}</Alert>
+        <Alert severity="info">
+          <Stack spacing={0.5}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              Normalize PENMAN
+            </Typography>
+            <Box
+              component="pre"
+              sx={{
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'monospace',
+                p: 1,
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                backgroundColor: 'grey.50',
+              }}
+            >
+              {report.canonicalPenman}
+            </Box>
+          </Stack>
+        </Alert>
       )}
       <Divider />
       {report.errors.length > 0 && (

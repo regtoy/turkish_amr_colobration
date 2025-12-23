@@ -28,6 +28,18 @@ export const PenmanDiff: React.FC<PenmanDiffProps> = ({
   }
 
   const diff = diffLines(left ?? '', right ?? '')
+  const diffStats = diff.reduce(
+    (acc, part) => {
+      const lineCount = part.value
+        .split('\n')
+        .filter((line, index, array) => !(index === array.length - 1 && line === '')).length
+      if (part.added) acc.added += lineCount
+      else if (part.removed) acc.removed += lineCount
+      else acc.unchanged += lineCount
+      return acc
+    },
+    { added: 0, removed: 0, unchanged: 0 },
+  )
 
   return (
     <Stack spacing={1}>
@@ -36,6 +48,12 @@ export const PenmanDiff: React.FC<PenmanDiffProps> = ({
           {title}
         </Typography>
         <Chip size="small" label="Satır bazlı" variant="outlined" />
+        {(diffStats.added > 0 || diffStats.removed > 0) && (
+          <>
+            <Chip size="small" label={`+${diffStats.added}`} color="success" variant="outlined" />
+            <Chip size="small" label={`-${diffStats.removed}`} color="error" variant="outlined" />
+          </>
+        )}
         {leftLabel && <Chip size="small" label={`Sol: ${leftLabel}`} color="primary" variant="outlined" />}
         {rightLabel && <Chip size="small" label={`Sağ: ${rightLabel}`} color="secondary" variant="outlined" />}
       </Stack>
