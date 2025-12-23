@@ -34,6 +34,92 @@ Varsayılan olarak SQLite (`amr.db`) dosyası oluşturulur. Ortam değişkenleri
 
 Kimlik doğrulama artık JWT tabanlıdır; `Authorization: Bearer` header’ı taşınmalıdır. Geriye dönük olarak `X-User-Id` ve `X-User-Role` header’ları da desteklenir. Roller `admin`, `annotator`, `reviewer` vb. enumerasyonlarla doğrulanır ve veritabanındaki kullanıcı kaydıyla tutarlı olmalıdır.
 
+## Local Development (step-by-step)
+
+### Prerequisites (all platforms)
+- Python 3.11+ and Node.js 18+
+- Package managers: `pip` and `npm`/`pnpm`
+- Database: SQLite is the default; for Postgres set `DATABASE_URL`
+- Recommended: Git, cURL, and a modern shell (bash/PowerShell)
+
+### Linux / macOS
+1. **Clone and navigate**
+   ```bash
+   git clone <this-repo-url> turkish_amr_collaboration
+   cd turkish_amr_collaboration
+   ```
+2. **Backend**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r backend/requirements.txt  # or install FastAPI/SQLModel deps manually
+   cd backend
+   cat > .env <<'EOF'
+   SECRET_KEY=changeme
+   DATABASE_URL=sqlite:///./amr.db  # replace with postgres URL if needed
+   DATABASE_ECHO=false
+   EOF
+   uvicorn app.main:app --reload --port 8000
+   ```
+   - Health check: `curl http://localhost:8000/health`
+3. **Frontend**
+   ```bash
+   cd ../frontend
+   npm install
+   cat > .env.local <<'EOF'
+   VITE_API_BASE_URL=http://localhost:8000
+   EOF
+   npm run dev -- --host --port 5173
+   ```
+   - Preview build: `npm run build && npm run preview -- --host --port 4173`
+4. **Manual smoke flow**
+   - Backend: `/auth/register` → admin approves via `/auth/approve/{id}` → `/auth/token` → `/auth/me`
+   - Projects: `POST /projects`, then `GET /projects/{id}/summary`
+   - Sentence lifecycle: `POST /sentences/project/{id}` → `/sentences/{sid}/assign` → `/sentences/{sid}/submit` → `/sentences/{sid}/review` → `/sentences/{sid}/adjudicate` → `/sentences/{sid}/accept`
+   - Export: `GET /exports/project/{id}` or create job via `POST /exports/project/{id}/jobs` then `GET /exports/jobs/{jobId}`
+   - Frontend: login → select project on Dashboard → Annotator page validate/submit → Export panel download
+
+### Windows (PowerShell)
+1. **Clone and navigate**
+   ```powershell
+   git clone <this-repo-url> turkish_amr_collaboration
+   Set-Location turkish_amr_collaboration
+   ```
+2. **Backend**
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
+   pip install -r backend/requirements.txt
+   Set-Location backend
+   @\"\nSECRET_KEY=changeme\nDATABASE_URL=sqlite:///./amr.db\nDATABASE_ECHO=false\n\"@ | Out-File -FilePath .env -Encoding utf8
+   uvicorn app.main:app --reload --port 8000
+   ```
+   - Health check: `curl http://localhost:8000/health`
+3. **Frontend**
+   ```powershell
+   Set-Location ..\frontend
+   npm install
+   @\"VITE_API_BASE_URL=http://localhost:8000\"@ | Out-File -FilePath .env.local -Encoding utf8
+   npm run dev -- --host --port 5173
+   ```
+   - Preview build: `npm run build; npm run preview -- --host --port 4173`
+4. **Notes**
+   - If Windows firewall blocks ports, allow 8000 (API) and 5173/4173 (frontend).
+   - For a Unix-like experience, WSL2 is supported: follow Linux steps inside WSL.
+
+### Database options
+- **SQLite (default):** no extra setup; file `amr.db` lives in `backend/`.
+- **Postgres:** set `DATABASE_URL=postgresql+psycopg://user:pass@host:5432/dbname`; install `psycopg[binary]` if not present.
+
+## CI/CD Pipeline Taslağı
+
+1. **Hazırlık:** PR ve main push tetikleyicileri; matris `python-version: [3.11]`, `node-version: [18]`; pip/npm cache kullanın.
+2. **Backend aşaması:** `pip install -r backend/requirements.txt`; lint (örn. `ruff` veya `flake8`), opsiyonel `mypy`; test: `pytest backend`; güvenlik: `bandit -r backend/app` (isteğe bağlı).
+3. **Frontend aşaması:** `npm ci`; `npm run lint`; `npm run test -- --runInBand`; `npm run build`.
+4. **Entegrasyon duman testi (opsiyonel):** `uvicorn app.main:app --port 8000` arka planda; `npm run build && npm run preview -- --host --port 4173`; `curl http://localhost:8000/health` ve `curl http://localhost:4173` ile 200 beklenir; küçük API akışını (proje/cümle/assign) doğrula.
+5. **Artefaktlar:** Test raporları (JUnit/HTML), frontend `dist` artefaktı; backend için wheel/zip opsiyonel.
+6. **Dağıtım (isteğe bağlı):** Çok aşamalı Dockerfile; stage 1 frontend build, stage 2 Python image ile backend + `dist`; env: `SECRET_KEY`, `DATABASE_URL`, CORS ayarları; healthcheck `/health`.
+
 ## Durum değerlendirme ve audit
 - **Proje özeti:** `GET /projects/{project_id}/summary` (admin/curator) — cümle durum dağılımı, atama ve değerlendirme sayıları.
 - **Audit kayıtları:** `GET /audit?project_id=...&limit=50&offset=0` (admin tüm kayıtlar, curator proje filtresi ile) — aksiyon bazlı audit log erişimi ve filtreleme. Sayfalama için `limit` (max 200) ve `offset` parametreleri kullanılabilir.
