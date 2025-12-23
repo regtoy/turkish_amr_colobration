@@ -65,7 +65,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         setIsLoading(false)
       }
     },
-    [syncAuthState],
+    [syncAuthState, refreshProfile],
   )
 
   useEffect(() => {
@@ -74,9 +74,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
       setIsLoading(true)
       try {
-        const profile = await authApi.profile()
-        userStorage.saveUser(profile)
-        setUser(profile)
+        await refreshProfile()
       } catch (error) {
         console.error('Failed to bootstrap profile', error)
         logout()
@@ -86,7 +84,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     }
 
     void bootstrapProfile()
-  }, [token, user, logout])
+  }, [token, user, logout, refreshProfile])
 
   const hasRole = useCallback(
     (role: Role) => {

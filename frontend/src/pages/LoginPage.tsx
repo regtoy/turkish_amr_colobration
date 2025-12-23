@@ -7,6 +7,7 @@ import { useAuthContext } from '@/auth/AuthProvider'
 import { Spinner } from '@/components/ui/Spinner'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { LoginPayload } from '@/types/auth'
+import { isRequired, isValidPasswordLength } from '@/validation/authValidation'
 
 export const LoginPage = () => {
   const { t } = useTranslation()

@@ -26,6 +26,33 @@ class CurrentUser:
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def _get_user_from_token(
+    credentials: Optional[HTTPAuthorizationCredentials],
+    session: Session,
+    *,
+    allow_inactive: bool = False,
+) -> tuple[User, Role]:
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Kimlik doğrulama bilgileri sağlanmadı",
+        )
+
+    payload = decode_access_token(credentials.credentials)
+    try:
+        user_id = int(payload["sub"])
+        role = Role(payload["role"])
+    except (KeyError, TypeError, ValueError) as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token yükü geçersiz") from exc
+
+    user = session.get(User, user_id)
+    if not user or (not allow_inactive and not user.is_active):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Kullanıcı aktif değil veya bulunamadı")
+    if user.role != role:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Rol bilgisi ile kullanıcı eşleşmiyor")
+    return user, role
+
+
 async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
@@ -34,20 +61,8 @@ async def get_current_user(
     x_project_id: Optional[str] = Header(default=None, alias="X-Project-Id"),
     session: Session = Depends(get_session),
 ) -> CurrentUser:
-    if credentials and credentials.scheme.lower() == "bearer":
-        payload = decode_access_token(credentials.credentials)
-        try:
-            user_id = int(payload["sub"])
-            role = Role(payload["role"])
-        except (KeyError, TypeError, ValueError) as exc:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token yükü geçersiz") from exc
-        user = session.get(User, user_id)
-        if not user or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Kullanıcı aktif değil veya bulunamadı"
-            )
-        if user.role != role:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Rol bilgisi ile kullanıcı eşleşmiyor")
+    if credentials:
+        user, role = _get_user_from_token(credentials, session)
         if user.role == Role.PENDING:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Kullanıcı onay bekliyor")
         return _attach_project_context(user, role, request, x_project_id, session)
