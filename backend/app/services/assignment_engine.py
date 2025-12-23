@@ -32,6 +32,11 @@ class AssignmentEngine:
             )
 
         eligible_members = self._eligible_member_ids(project_id=project_id, role=role)
+        if not eligible_members:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bu rol için aktif proje üyesi bulunamadı.",
+            )
 
         if provided_assignees:
             assignees: list[int] = []
@@ -137,6 +142,11 @@ class AssignmentEngine:
                 UserProfile.is_active.is_(True),
             )
         ).all()
+        if not profiles:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bu rol için aktif kullanıcı profili bulunamadı.",
+            )
 
         required_set = {skill.lower() for skill in required_skills}
         load = self._assignment_load(project_id=project_id, role=role)
@@ -148,7 +158,11 @@ class AssignmentEngine:
                 scored_profiles.append((overlap, profile.user_id))
 
         if not scored_profiles:
-            return []
+            skills = ", ".join(required_skills)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Gerekli becerilere sahip kullanıcı bulunamadı: {skills}.",
+            )
 
         sorted_candidates = sorted(
             scored_profiles,
