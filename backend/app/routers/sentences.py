@@ -249,13 +249,22 @@ def submit_annotation(
     report_json = report.to_json()
 
     if not report.is_valid:
+        error_codes = [issue.code for issue in report.errors]
+        warning_codes = [issue.code for issue in report.warnings]
         _record_failed_submission(
             session,
             project=project,
             sentence=sentence,
             failure_type="validation",
             reason="Validasyon başarısız.",
-            details=report.to_dict(),
+            details={
+                "report": report.to_dict(),
+                "error_codes": error_codes,
+                "warning_codes": warning_codes,
+                "rule_version": project.validation_rule_version,
+                "amr_version": project.amr_version,
+                "role_set_version": project.role_set_version,
+            },
             assignment_id=assignment.id,
             user_id=user.user_id,
             penman_text=payload.penman_text,
@@ -263,7 +272,15 @@ def submit_annotation(
         session.commit()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"message": "Validasyon hatası", "errors": report.to_dict().get("errors", [])},
+            detail={
+                "message": "Validasyon hatası",
+                "errors": report.to_dict().get("errors", []),
+                "warnings": report.to_dict().get("warnings", []),
+                "canonical_penman": report.canonical_penman,
+                "amr_version": report.amr_version,
+                "role_set_version": report.role_set_version,
+                "rule_version": report.rule_version,
+            },
         )
 
     annotation = Annotation(

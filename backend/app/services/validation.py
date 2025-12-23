@@ -1,7 +1,11 @@
 import json
 import re
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable, Sequence
+
+import penman
+from penman.exceptions import DecodeError
 
 
 @dataclass
@@ -48,8 +52,18 @@ class ValidationService:
         self.role_set_version = role_set_version
         self.rule_version = rule_version
         self._allowed_roles = self._build_allowed_roles(role_set_version)
+        self._modular_checks: Sequence[
+            tuple[str, Callable[[penman.Graph, str], tuple[list[ValidationIssue], list[ValidationIssue]]]]
+        ] = (
+            ("root", self._check_root),
+            ("variables", self._check_variable_consistency),
+            ("reentrancy", self._check_reentrancy),
+            ("triple_roles", self._check_roles),
+            ("lint", self._lint_warnings),
+        )
 
     def validate(self, penman_text: str) -> ValidationReport:
+        original_text = penman_text
         normalized = self._normalize(penman_text)
         errors: list[ValidationIssue] = []
         warnings: list[ValidationIssue] = []
@@ -60,30 +74,27 @@ class ValidationService:
 
         if not self._parentheses_balanced(normalized):
             errors.append(ValidationIssue(code="parse_error", message="Parantez dengesi hatalı."))
+            return self._report(errors, warnings, canonical_penman=None)
 
-        root_var = self._extract_root(normalized)
-        if not root_var:
-            errors.append(ValidationIssue(code="missing_root", message="Kök düğüm tespit edilemedi."))
-
-        roles = self._extract_roles(normalized)
-        disallowed_roles = sorted(role for role in roles if role not in self._allowed_roles)
-        if disallowed_roles:
+        graph: penman.Graph | None = None
+        try:
+            graph = penman.decode(normalized)
+        except DecodeError as exc:
             errors.append(
                 ValidationIssue(
-                    code="role_mismatch",
-                    message="İzin verilmeyen rol(ler) kullanılmış.",
-                    context={"roles": disallowed_roles, "role_set_version": self.role_set_version},
+                    code="parse_error",
+                    message="PENMAN çözümleme hatası.",
+                    context={"detail": str(exc)},
                 )
             )
-        if not roles:
-            warnings.append(
-                ValidationIssue(
-                    code="no_roles_detected",
-                    message="AMR içinde PropBank rolü tespit edilemedi.",
-                )
-            )
+            return self._report(errors, warnings, canonical_penman=None)
 
-        canonical_penman = self._canonicalize(normalized, root_var)
+        for _, check in self._modular_checks:
+            check_errors, check_warnings = check(graph, original_text)
+            errors.extend(check_errors)
+            warnings.extend(check_warnings)
+
+        canonical_penman = self._canonicalize(graph)
         return self._report(errors, warnings, canonical_penman=canonical_penman)
 
     def _report(
@@ -118,15 +129,6 @@ class ValidationService:
         return depth == 0
 
     @staticmethod
-    def _extract_root(text: str) -> str | None:
-        match = re.search(r"\(\s*([a-zA-Z][\w-]*)\s*/", text)
-        return match.group(1) if match else None
-
-    @staticmethod
-    def _extract_roles(text: str) -> set[str]:
-        return {match.group(1) for match in re.finditer(r":([A-Za-z0-9_-]+)", text)}
-
-    @staticmethod
     def _build_allowed_roles(role_set_version: str) -> set[str]:
         base_roles = {
             "ARG0",
@@ -155,8 +157,159 @@ class ValidationService:
             base_roles.update({"ARGM-CAUS", "ARGM-ADJ"})
         return base_roles
 
-    def _canonicalize(self, text: str, root_var: str | None) -> str:
-        compact = re.sub(r"\s+", " ", text).strip()
-        if root_var and not compact.startswith(f"({root_var} /"):
-            compact = f"({root_var} /" + compact.split("/", 1)[1] if "/" in compact else compact
-        return compact
+    def _canonicalize(self, graph: penman.Graph) -> str:
+        return penman.encode(graph, indent=None)
+
+    def _check_root(self, graph: penman.Graph, _: str) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
+        errors: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
+        root = graph.top
+        if not root:
+            errors.append(ValidationIssue(code="missing_root", message="Kök düğüm tespit edilemedi."))
+            return errors, warnings
+        instances = {var: concept for var, _, concept in graph.instances()}
+        if root not in instances:
+            errors.append(
+                ValidationIssue(
+                    code="uninstantiated_root",
+                    message="Kök düğüm için kavram bulunamadı.",
+                    context={"root": root},
+                )
+            )
+        return errors, warnings
+
+    def _check_variable_consistency(
+        self, graph: penman.Graph, _: str
+    ) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
+        errors: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
+        variable_pattern = re.compile(r"^[a-zA-Z][\w-]*$")
+
+        instances: dict[str, str] = {}
+        duplicate_instances: list[tuple[str, str, str]] = []
+        for var, _, concept in graph.instances():
+            if not variable_pattern.match(var):
+                errors.append(
+                    ValidationIssue(
+                        code="invalid_variable_name",
+                        message="Geçersiz değişken adı.",
+                        context={"variable": var},
+                    )
+                )
+            if var in instances and instances[var] != concept:
+                duplicate_instances.append((var, instances[var], concept))
+            instances[var] = concept
+
+        for var, previous, current in duplicate_instances:
+            errors.append(
+                ValidationIssue(
+                    code="conflicting_instances",
+                    message="Aynı değişken birden fazla kavramla eşlenmiş.",
+                    context={"variable": var, "existing": previous, "conflict": current},
+                )
+            )
+
+        referenced_vars = {
+            target
+            for _, role, target in graph.triples
+            if isinstance(target, str) and role != ":instance" and variable_pattern.match(target)
+        }
+        dangling = sorted(referenced_vars - set(instances))
+        if dangling:
+            errors.append(
+                ValidationIssue(
+                    code="dangling_variable",
+                    message="Tanımlanmayan değişkene referans var.",
+                    context={"variables": dangling},
+                )
+            )
+
+        if not instances:
+            warnings.append(
+                ValidationIssue(
+                    code="no_instances",
+                    message="Hiçbir düğümde kavram tanımı bulunamadı.",
+                )
+            )
+        return errors, warnings
+
+    def _check_reentrancy(self, graph: penman.Graph, _: str) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
+        errors: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
+        incoming_edges: Counter[str] = Counter()
+        for _, role, target in graph.triples:
+            if role == ":instance":
+                continue
+            if isinstance(target, str):
+                incoming_edges[target] += 1
+
+        reentrant_nodes = {node: count for node, count in incoming_edges.items() if count > 1}
+        for node, count in sorted(reentrant_nodes.items()):
+            warnings.append(
+                ValidationIssue(
+                    code="reentrancy",
+                    message="Düğüm birden fazla üstten bağ alıyor.",
+                    context={"variable": node, "incoming_edges": count},
+                )
+            )
+        return errors, warnings
+
+    def _check_roles(self, graph: penman.Graph, _: str) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
+        errors: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
+
+        propbank_roles: list[str] = []
+        for _, role, _ in graph.triples:
+            role = role.lstrip(":")
+            if role.upper().startswith("ARG"):
+                propbank_roles.append(role.upper())
+
+        disallowed_roles = sorted(role for role in propbank_roles if role not in self._allowed_roles)
+        if disallowed_roles:
+            errors.append(
+                ValidationIssue(
+                    code="role_mismatch",
+                    message="İzin verilmeyen PropBank rol(ler) kullanılmış.",
+                    context={"roles": disallowed_roles, "role_set_version": self.role_set_version},
+                )
+            )
+        if not propbank_roles:
+            warnings.append(
+                ValidationIssue(
+                    code="no_roles_detected",
+                    message="AMR içinde PropBank rolü tespit edilemedi.",
+                )
+            )
+        return errors, warnings
+
+    def _lint_warnings(self, graph: penman.Graph, text: str) -> tuple[list[ValidationIssue], list[ValidationIssue]]:
+        errors: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
+
+        duplicate_roles: dict[str, list[str]] = defaultdict(list)
+        for source, role, target in graph.triples:
+            if role == ":instance" or not isinstance(target, str):
+                continue
+            duplicate_roles[source].append(role)
+
+        for source, roles in duplicate_roles.items():
+            counts = Counter(roles)
+            problematic = {role: count for role, count in counts.items() if count > 1}
+            if problematic:
+                warnings.append(
+                    ValidationIssue(
+                        code="duplicate_roles",
+                        message="Aynı düğüm için yinelenen roller mevcut.",
+                        context={"variable": source, "roles": sorted(problematic.keys())},
+                    )
+                )
+
+        if text.strip() != text:
+            warnings.append(
+                ValidationIssue(
+                    code="leading_trailing_whitespace",
+                    message="Başta/sonda gereksiz boşluklar bulundu, kanonize edildi.",
+                )
+            )
+
+        return errors, warnings
