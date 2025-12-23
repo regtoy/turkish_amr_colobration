@@ -1,11 +1,10 @@
 from datetime import datetime
-from typing import Optional, Union
+from typing import Any, Optional
 
 from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
-JSONPrimitive = Union[str, int, float, bool, None]
-JSONValue = Union[JSONPrimitive, list["JSONValue"], dict[str, "JSONValue"]]
+JSONValue = Any
 
 
 class FailedSubmission(SQLModel, table=True):

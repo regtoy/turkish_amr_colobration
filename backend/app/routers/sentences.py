@@ -251,6 +251,11 @@ def submit_annotation(
     if not report.is_valid:
         error_codes = [issue.code for issue in report.errors]
         warning_codes = [issue.code for issue in report.warnings]
+        submission_versions = {
+            "rule_version": project.validation_rule_version,
+            "amr_version": project.amr_version,
+            "role_set_version": project.role_set_version,
+        }
         _record_failed_submission(
             session,
             project=project,
@@ -261,9 +266,9 @@ def submit_annotation(
                 "report": report.to_dict(),
                 "error_codes": error_codes,
                 "warning_codes": warning_codes,
-                "rule_version": project.validation_rule_version,
-                "amr_version": project.amr_version,
-                "role_set_version": project.role_set_version,
+                "canonical_penman": report.canonical_penman,
+                "triple_count": report.triple_count,
+                **submission_versions,
             },
             assignment_id=assignment.id,
             user_id=user.user_id,
@@ -277,6 +282,7 @@ def submit_annotation(
                 "errors": report.to_dict().get("errors", []),
                 "warnings": report.to_dict().get("warnings", []),
                 "canonical_penman": report.canonical_penman,
+                "triple_count": report.triple_count,
                 "amr_version": report.amr_version,
                 "role_set_version": report.role_set_version,
                 "rule_version": report.rule_version,
@@ -387,6 +393,9 @@ def review_annotation(
                 "annotation_id": payload.annotation_id,
                 "decision": payload.decision.value,
                 "score": payload.score,
+                "rule_version": project.validation_rule_version,
+                "amr_version": project.amr_version,
+                "role_set_version": project.role_set_version,
             },
             annotation_id=annotation.id,
             assignment_id=annotation.assignment_id,
