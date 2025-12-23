@@ -10,6 +10,7 @@ import { ProjectGrid } from '@/components/dashboard/ProjectGrid'
 import { ProjectSummaryCards } from '@/components/dashboard/ProjectSummaryCards'
 import type { TaskAction } from '@/components/dashboard/TaskList'
 import { TaskList } from '@/components/dashboard/TaskList'
+import { ExportPanel } from '@/components/dashboard/export/ExportPanel'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Project, ProjectSummary } from '@/types/project'
 import type { SentenceItem } from '@/types/sentence'
@@ -128,6 +129,8 @@ export const DashboardPage = () => {
       />
 
       <ProjectSummaryCards summary={projectSummary} isLoading={isSummaryLoading} error={summaryError} />
+
+      <ExportPanel projectId={selectedProjectId} />
 
       <TaskList
         tasks={sentences}
