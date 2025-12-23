@@ -17,12 +17,14 @@ import {
 import { useState } from 'react'
 
 import type { ExportLevel, PiiStrategy } from '@/types/export'
+import type { ExportFormat } from '@/types/export'
 
 export interface ExportFormValues {
   level: ExportLevel
   includeFailed: boolean
   includeRejected: boolean
   piiStrategy: PiiStrategy
+  format: ExportFormat
 }
 
 interface ExportFormProps {
@@ -46,6 +48,7 @@ export const ExportForm: React.FC<ExportFormProps> = ({ onDownload, onCreateJob,
     includeFailed: false,
     includeRejected: false,
     piiStrategy: 'anonymize',
+    format: 'json',
   })
 
   const handleChange = (field: keyof ExportFormValues, value: ExportFormValues[keyof ExportFormValues]) => {
@@ -83,6 +86,18 @@ export const ExportForm: React.FC<ExportFormProps> = ({ onDownload, onCreateJob,
                   {option.label}
                 </MenuItem>
               ))}
+            </TextField>
+
+            <TextField
+              select
+              label="Format"
+              value={values.format}
+              onChange={(event) => handleChange('format', event.target.value as ExportFormat)}
+              fullWidth
+              size="small"
+            >
+              <MenuItem value="json">Tek JSON</MenuItem>
+              <MenuItem value="manifest+json">Manifest + JSON (zip)</MenuItem>
             </TextField>
 
             <TextField

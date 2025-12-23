@@ -16,6 +16,9 @@ const mapJob = (payload: Record<string, unknown>): ExportJob => ({
   format: String(payload.format ?? 'json') as ExportJob['format'],
   level: String(payload.level ?? 'all') as ExportJob['level'],
   piiStrategy: String(payload.pii_strategy ?? payload.piiStrategy ?? 'anonymize') as ExportJob['piiStrategy'],
+  includeManifest: Boolean(payload.include_manifest ?? payload.includeManifest ?? true),
+  includeFailed: Boolean(payload.include_failed ?? payload.includeFailed ?? false),
+  includeRejected: Boolean(payload.include_rejected ?? payload.includeRejected ?? false),
   resultPath: (payload.result_path as string | null | undefined) ?? null,
   errorMessage: (payload.error_message as string | null | undefined) ?? null,
   createdAt: String(payload.created_at ?? ''),
@@ -50,6 +53,9 @@ export const exportsApi = {
       format: payload.format,
       level: payload.level,
       pii_strategy: payload.piiStrategy,
+      include_manifest: payload.includeManifest ?? true,
+      include_failed: payload.includeFailed ?? false,
+      include_rejected: payload.includeRejected ?? false,
     })
     return mapJob(data)
   },
@@ -57,6 +63,10 @@ export const exportsApi = {
   async getJob(jobId: number): Promise<ExportJob> {
     const { data } = await apiClient.get<Record<string, unknown>>(`/exports/jobs/${jobId}`)
     return mapJob(data)
+  },
+
+  getDownloadUrl(jobId: number): string {
+    return `/exports/jobs/${jobId}/download`
   },
 }
 
@@ -68,10 +78,11 @@ export const toHistoryEntry = (job: ExportJob): ExportHistoryEntry => ({
   status: job.status,
   level: job.level,
   piiStrategy: job.piiStrategy,
-  includeFailed: false,
-  includeRejected: false,
+  includeFailed: job.includeFailed,
+  includeRejected: job.includeRejected,
   startedAt: job.createdAt,
   completedAt: ['completed', 'failed'].includes(job.status) ? job.updatedAt : undefined,
   fileName: job.resultPath ?? undefined,
   resultPath: job.resultPath,
+  downloadUrl: job.resultPath ? exportsApi.getDownloadUrl(job.id) : undefined,
 })

@@ -22,6 +22,9 @@ export interface ExportJob {
   format: ExportFormat
   level: ExportLevel
   piiStrategy: PiiStrategy
+  includeManifest: boolean
+  includeFailed: boolean
+  includeRejected: boolean
   resultPath?: string | null
   errorMessage?: string | null
   createdAt: string
@@ -33,6 +36,9 @@ export interface ExportJobRequest {
   format: ExportFormat
   level: ExportLevel
   piiStrategy: PiiStrategy
+  includeManifest?: boolean
+  includeFailed?: boolean
+  includeRejected?: boolean
 }
 
 export interface ExportRequestPayload extends ExportJobRequest {
@@ -56,4 +62,5 @@ export interface ExportHistoryEntry {
   fileName?: string
   localUrl?: string
   resultPath?: string | null
+  downloadUrl?: string
 }
