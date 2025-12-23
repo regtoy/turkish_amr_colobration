@@ -6,16 +6,24 @@ interface ValidationSummaryProps {
   report?: ValidationReport | null
   isLoading?: boolean
   title: string
+  emptyMessage?: string
+  loadingMessage?: string
 }
 
-export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ report, isLoading = false, title }) => {
+export const ValidationSummary: React.FC<ValidationSummaryProps> = ({
+  report,
+  isLoading = false,
+  title,
+  emptyMessage = 'Henüz sunucu validasyonu yok.',
+  loadingMessage = 'Validasyon çalıştırılıyor…',
+}) => {
   if (isLoading) {
     return (
       <Stack spacing={1.5}>
         <Typography variant="subtitle1" fontWeight={700}>
           {title}
         </Typography>
-        <Alert severity="info">Validasyon çalıştırılıyor…</Alert>
+        <Alert severity="info">{loadingMessage}</Alert>
       </Stack>
     )
   }
@@ -26,7 +34,7 @@ export const ValidationSummary: React.FC<ValidationSummaryProps> = ({ report, is
         <Typography variant="subtitle1" fontWeight={700}>
           {title}
         </Typography>
-        <Alert severity="warning">Henüz sunucu validasyonu yok.</Alert>
+        <Alert severity="warning">{emptyMessage}</Alert>
       </Stack>
     )
   }

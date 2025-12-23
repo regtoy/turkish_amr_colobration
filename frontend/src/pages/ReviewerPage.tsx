@@ -1,12 +1,12 @@
 import {
   Alert,
-  Box,
   Button,
   Card,
   CardContent,
   Chip,
   Divider,
   FormControl,
+  Grid,
   InputLabel,
   MenuItem,
   Select,
@@ -42,6 +42,7 @@ export const ReviewerPage = () => {
   const [score, setScore] = useState<string>('1.0')
   const [comment, setComment] = useState<string>('')
   const [isMultiAnnotator, setIsMultiAnnotator] = useState<boolean>(false)
+  const [compareMode, setCompareMode] = useState<'annotation' | 'adjudication'>('annotation')
 
   const parseError = (error: unknown) => {
     if (axios.isAxiosError(error)) {
@@ -66,6 +67,12 @@ export const ReviewerPage = () => {
   const reviewsQuery = useQuery({
     queryKey: sentenceId ? queryKeys.reviews(sentenceId) : ['sentence', 'reviews', 'idle'],
     queryFn: () => sentencesApi.reviews(sentenceId!),
+    enabled: !!sentenceId,
+  })
+
+  const adjudicationQuery = useQuery({
+    queryKey: sentenceId ? queryKeys.adjudication(sentenceId) : ['sentence', 'adjudication', 'idle'],
+    queryFn: () => sentencesApi.adjudication(sentenceId!),
     enabled: !!sentenceId,
   })
 
@@ -105,11 +112,17 @@ export const ReviewerPage = () => {
   const currentSentence = sentenceQuery.data
 
   const effectiveSelectedId = selectedAnnotationId ?? annotationsQuery.data?.[0]?.id ?? null
-  const effectiveCompareId =
-    compareAnnotationId ?? (annotationsQuery.data && annotationsQuery.data.length > 1 ? annotationsQuery.data[1]?.id ?? null : null)
+  const defaultCompareId =
+    annotationsQuery.data && annotationsQuery.data.length > 1 ? annotationsQuery.data[1]?.id ?? null : null
+  const effectiveCompareId = compareMode === 'annotation' ? compareAnnotationId ?? defaultCompareId : null
 
   const selectedAnnotation = annotationsQuery.data?.find((item) => item.id === effectiveSelectedId)
-  const compareAnnotation = annotationsQuery.data?.find((item) => item.id === effectiveCompareId)
+  const compareAnnotation =
+    compareMode === 'annotation' ? annotationsQuery.data?.find((item) => item.id === effectiveCompareId) : null
+  const adjudicatedPenman = adjudicationQuery.data?.finalPenman ?? null
+  const diffRightText = compareMode === 'adjudication' ? adjudicatedPenman : compareAnnotation?.penmanText
+  const diffRightLabel =
+    compareMode === 'adjudication' ? t('pages.reviewer.adjudicationTarget', { defaultValue: 'Adjudication' }) : compareAnnotation ? `#${compareAnnotation.id}` : undefined
 
   const loadSentence = () => {
     const numeric = Number(sentenceIdInput)
@@ -119,6 +132,7 @@ export const ReviewerPage = () => {
     }
     setSelectedAnnotationId(null)
     setCompareAnnotationId(null)
+    setCompareMode('annotation')
     setSentenceId(numeric)
   }
 
@@ -199,62 +213,112 @@ export const ReviewerPage = () => {
 
       {annotationsQuery.data && (
         <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <Typography variant="h6" fontWeight={700} flexGrow={1}>
-              {t('pages.reviewer.annotationList')}
-            </Typography>
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel id="selected-annotation">{t('pages.reviewer.pickAnnotation')}</InputLabel>
-              <Select
-                labelId="selected-annotation"
-                value={selectedAnnotationId ?? effectiveSelectedId ?? ''}
-                label={t('pages.reviewer.pickAnnotation')}
-                onChange={(event) => setSelectedAnnotationId(Number(event.target.value))}
-              >
-                {annotationsQuery.data.map((annotation) => (
-                  <MenuItem key={annotation.id} value={annotation.id}>
-                    #{annotation.id} — {annotation.authorId}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel id="compare-annotation">{t('pages.reviewer.compareWith')}</InputLabel>
-              <Select
-                labelId="compare-annotation"
-                value={compareAnnotationId ?? effectiveCompareId ?? ''}
-                label={t('pages.reviewer.compareWith')}
-                onChange={(event) => setCompareAnnotationId(event.target.value ? Number(event.target.value) : null)}
-              >
-                <MenuItem value="">{t('pages.reviewer.noCompare')}</MenuItem>
-                {annotationsQuery.data.map((annotation) => (
-                  <MenuItem key={annotation.id} value={annotation.id}>
-                    #{annotation.id} — {annotation.authorId}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+                  <Typography variant="h6" fontWeight={700} flexGrow={1}>
+                    {t('pages.reviewer.annotationList')}
+                  </Typography>
+                  <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel id="selected-annotation">{t('pages.reviewer.pickAnnotation')}</InputLabel>
+                    <Select
+                      labelId="selected-annotation"
+                      value={selectedAnnotationId ?? effectiveSelectedId ?? ''}
+                      label={t('pages.reviewer.pickAnnotation')}
+                      onChange={(event) => setSelectedAnnotationId(Number(event.target.value))}
+                    >
+                      {annotationsQuery.data.map((annotation) => (
+                        <MenuItem key={annotation.id} value={annotation.id}>
+                          #{annotation.id} — {annotation.authorId}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ minWidth: 220 }}>
+                    <InputLabel id="compare-annotation">{t('pages.reviewer.compareWith')}</InputLabel>
+                    <Select
+                      labelId="compare-annotation"
+                      value={compareMode === 'adjudication' ? 'adjudication' : compareAnnotationId ?? effectiveCompareId ?? ''}
+                      label={t('pages.reviewer.compareWith')}
+                      onChange={(event) => {
+                        const value = event.target.value
+                        if (value === 'adjudication') {
+                          setCompareMode('adjudication')
+                          setCompareAnnotationId(null)
+                          return
+                        }
+                        setCompareMode('annotation')
+                        setCompareAnnotationId(value ? Number(value) : null)
+                      }}
+                    >
+                      <MenuItem value="">{t('pages.reviewer.noCompare')}</MenuItem>
+                      {annotationsQuery.data.map((annotation) => (
+                        <MenuItem key={annotation.id} value={annotation.id}>
+                          #{annotation.id} — {annotation.authorId}
+                        </MenuItem>
+                      ))}
+                      <MenuItem value="adjudication" disabled={!adjudicationQuery.data}>
+                        {t('pages.reviewer.compareWithAdjudication', { defaultValue: 'Adjudication sonucu' })}
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+                </Stack>
 
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-            <Box flex={1}>
-              {selectedAnnotation ? (
-                <AnnotationCard annotation={selectedAnnotation} />
-              ) : (
-                <Alert severity="info">{t('pages.reviewer.noSelection')}</Alert>
-              )}
-              {selectedAnnotation?.validityReport && (
-                <Box mt={2}>
-                  <ValidationSummary title={t('pages.reviewer.validationReport')} report={selectedAnnotation.validityReport} />
-                </Box>
-              )}
-              {renderReviewHistory}
-            </Box>
+                <Grid container spacing={2}>
+                  {annotationsQuery.data.map((annotation) => (
+                    <Grid item xs={12} md={6} key={annotation.id}>
+                      <AnnotationCard
+                        annotation={annotation}
+                        selected={annotation.id === effectiveSelectedId}
+                        onSelect={() => setSelectedAnnotationId(annotation.id)}
+                        actionLabel={annotation.id === effectiveSelectedId ? t('pages.curator.selected') : undefined}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Stack>
+            </CardContent>
+          </Card>
 
-            <Box flex={1}>
-              <PenmanDiff left={selectedAnnotation?.penmanText} right={compareAnnotation?.penmanText} />
-            </Box>
-          </Stack>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  <Typography variant="h6" fontWeight={700} flexGrow={1}>
+                    {t('pages.reviewer.validationPanel', { defaultValue: 'Validasyon ve Diff' })}
+                  </Typography>
+                  {adjudicationQuery.data && (
+                    <Chip
+                      color="primary"
+                      variant="outlined"
+                      label={t('pages.reviewer.latestAdjudication', {
+                        defaultValue: `Son adjudication #${adjudicationQuery.data.id}`,
+                      })}
+                    />
+                  )}
+                </Stack>
+
+                <ValidationSummary
+                  title={t('pages.reviewer.validationReport')}
+                  report={selectedAnnotation?.validityReport}
+                  emptyMessage={t('pages.reviewer.validationEmpty', { defaultValue: 'Seçili anotasyon için validasyon yok.' })}
+                />
+
+                <PenmanDiff
+                  left={selectedAnnotation?.penmanText}
+                  right={diffRightText}
+                  title={t('pages.reviewer.diffTitle', { defaultValue: 'Anotasyon karşılaştırma' })}
+                  leftLabel={selectedAnnotation ? `#${selectedAnnotation.id}` : undefined}
+                  rightLabel={diffRightLabel}
+                  emptyText={t('pages.reviewer.noDiffTarget', {
+                    defaultValue: 'Karşılaştırma için anotasyon veya adjudication seçin.',
+                  })}
+                />
+                {renderReviewHistory}
+              </Stack>
+            </CardContent>
+          </Card>
 
           <Card variant="outlined">
             <CardContent>
@@ -306,13 +370,23 @@ export const ReviewerPage = () => {
                   fullWidth
                 />
                 <Divider />
-                <Button
-                  variant="contained"
-                  onClick={() => reviewMutation.mutate()}
-                  disabled={!selectedAnnotationId || reviewMutation.isPending || !sentenceId}
-                >
-                  {t('pages.reviewer.submit')}
-                </Button>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+                  <Button
+                    variant="contained"
+                    onClick={() => reviewMutation.mutate()}
+                    disabled={!effectiveSelectedId || reviewMutation.isPending || !sentenceId}
+                  >
+                    {t('pages.reviewer.submit')}
+                  </Button>
+                  {reviewsQuery.data?.length ? (
+                    <Typography color="text.secondary">
+                      {t('pages.reviewer.reviewCount', {
+                        defaultValue: 'Toplam inceleme: {{count}}',
+                        count: reviewsQuery.data.length,
+                      })}
+                    </Typography>
+                  ) : null}
+                </Stack>
               </Stack>
             </CardContent>
           </Card>

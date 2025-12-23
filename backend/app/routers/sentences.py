@@ -552,7 +552,13 @@ def list_annotations(
 ) -> list[Annotation]:
     sentence = _get_sentence(session, sentence_id)
     require_roles(user, {Role.ADMIN, Role.CURATOR, Role.REVIEWER, Role.ANNOTATOR}, use_project_roles=True)
-    return list(session.exec(select(Annotation).where(Annotation.sentence_id == sentence.id)))
+    return list(
+        session.exec(
+            select(Annotation)
+            .where(Annotation.sentence_id == sentence.id)
+            .order_by(Annotation.created_at.desc(), Annotation.id.desc())
+        )
+    )
 
 
 @router.get("/{sentence_id}/reviews", response_model=list[Review])
@@ -566,7 +572,7 @@ def list_reviews(
             select(Review)
             .join(Annotation, Annotation.id == Review.annotation_id)
             .where(Annotation.sentence_id == sentence.id)
-            .order_by(Review.created_at.desc())
+            .order_by(Review.created_at.desc(), Review.id.desc())
         )
     )
 
@@ -580,7 +586,7 @@ def get_adjudication(
     return session.exec(
         select(Adjudication)
         .where(Adjudication.sentence_id == sentence.id)
-        .order_by(Adjudication.created_at.desc())
+        .order_by(Adjudication.created_at.desc(), Adjudication.id.desc())
         .limit(1)
     ).first()
 

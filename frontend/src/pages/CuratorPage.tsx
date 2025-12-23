@@ -1,14 +1,4 @@
-import {
-  Alert,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  Stack,
-  TextField,
-  Typography,
-} from '@mui/material'
+import { Alert, Box, Button, Card, CardContent, Chip, Divider, Stack, TextField, Typography } from '@mui/material'
 import Grid from '@mui/material/GridLegacy'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
@@ -19,9 +9,9 @@ import { queryKeys } from '@/api/queryKeys'
 import { sentencesApi } from '@/api/sentences'
 import { Spinner } from '@/components/ui/Spinner'
 import { useToast } from '@/components/ui/ToastProvider'
+import { AdjudicationForm } from '@/components/workspace/AdjudicationForm'
 import { AnnotationCard } from '@/components/workspace/AnnotationCard'
 import { PenmanDiff } from '@/components/workspace/PenmanDiff'
-import { PenmanEditor } from '@/components/workspace/PenmanEditor'
 import { ValidationSummary } from '@/components/workspace/ValidationSummary'
 import type { SentenceItem } from '@/types/sentence'
 import type { ValidationReport } from '@/types/validation'
@@ -64,7 +54,24 @@ export const CuratorPage = () => {
     enabled: !!sentenceId,
   })
 
-  const penmanForActions = finalPenman || adjudicationQuery.data?.finalPenman || ''
+  const reviewsQuery = useQuery({
+    queryKey: sentenceId ? queryKeys.reviews(sentenceId) : ['sentence', 'reviews', 'idle'],
+    queryFn: () => sentencesApi.reviews(sentenceId!),
+    enabled: !!sentenceId,
+  })
+
+  const adjudicationSources = adjudicationQuery.data?.sourceAnnotationIds ?? []
+  const adjudicationFinalPenman = adjudicationQuery.data?.finalPenman ?? ''
+  const adjudicationDecisionNote = adjudicationQuery.data?.decisionNote ?? ''
+  const effectiveSelectedSources = selectedSources.length ? selectedSources : adjudicationSources
+  const primaryAnnotation =
+    annotationsQuery.data?.find((annotation) => annotation.id === effectiveSelectedSources[0]) ??
+    annotationsQuery.data?.[0]
+  const secondaryAnnotation = annotationsQuery.data?.find((annotation) => annotation.id === effectiveSelectedSources[1])
+  const effectiveFinalPenman = finalPenman || adjudicationFinalPenman || primaryAnnotation?.penmanText || ''
+  const effectiveDecisionNote = decisionNote || adjudicationDecisionNote
+
+  const penmanForActions = effectiveFinalPenman
 
   const validationMutation = useMutation({
     mutationFn: () => sentencesApi.validate(sentenceId!, penmanForActions),
@@ -81,8 +88,8 @@ export const CuratorPage = () => {
     mutationFn: () =>
       sentencesApi.adjudicate(sentenceId!, {
         finalPenman: penmanForActions,
-        decisionNote,
-        sourceAnnotationIds: selectedSources,
+        decisionNote: effectiveDecisionNote,
+        sourceAnnotationIds: effectiveSelectedSources,
       }),
     onMutate: async () => {
       if (!sentenceId) return undefined
@@ -132,7 +139,7 @@ export const CuratorPage = () => {
   })
 
   const reopenMutation = useMutation({
-    mutationFn: () => sentencesApi.reopen(sentenceId!, decisionNote),
+    mutationFn: () => sentencesApi.reopen(sentenceId!, effectiveDecisionNote),
     onMutate: async () => {
       if (!sentenceId) return undefined
       await queryClient.cancelQueries({ queryKey: queryKeys.sentence(sentenceId) })
@@ -157,9 +164,10 @@ export const CuratorPage = () => {
   const currentSentence = sentenceQuery.data
 
   const toggleSource = (annotationId: number) => {
-    setSelectedSources((prev) =>
-      prev.includes(annotationId) ? prev.filter((id) => id !== annotationId) : [...prev, annotationId],
-    )
+    setSelectedSources((prev) => {
+      const base = prev.length ? prev : adjudicationSources
+      return base.includes(annotationId) ? base.filter((id) => id !== annotationId) : [...base, annotationId]
+    })
   }
 
   const loadSentence = () => {
@@ -231,104 +239,137 @@ export const CuratorPage = () => {
       )}
 
       {annotationsQuery.data && (
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={2}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography variant="h6" fontWeight={700} flexGrow={1}>
-                  {t('pages.curator.annotationSelection')}
-                </Typography>
-                <Chip label={t('pages.curator.selectedCount', { count: selectedSources.length })} variant="outlined" />
+        <Stack spacing={2}>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                  <Typography variant="h6" fontWeight={700} flexGrow={1}>
+                    {t('pages.curator.annotationSelection')}
+                  </Typography>
+                  <Chip
+                    label={t('pages.curator.selectedCount', { count: effectiveSelectedSources.length })}
+                    variant="outlined"
+                  />
+                </Stack>
+                <Grid container spacing={2}>
+                  {annotationsQuery.data.map((annotation) => (
+                    <Grid item xs={12} md={6} key={annotation.id}>
+                      <AnnotationCard
+                        annotation={annotation}
+                        selected={effectiveSelectedSources.includes(annotation.id)}
+                        onSelect={() => toggleSource(annotation.id)}
+                        actionLabel={
+                          effectiveSelectedSources.includes(annotation.id) ? t('pages.curator.selected') : undefined
+                        }
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+                {reviewsQuery.data?.length ? (
+                  <>
+                    <Divider />
+                    <Stack spacing={1}>
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        {t('pages.reviewer.previousReviews')}
+                      </Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap">
+                        {reviewsQuery.data.map((review) => (
+                          <Chip
+                            key={review.id}
+                            label={`#${review.id} • ${review.decision} • ${review.score ?? '-'}`}
+                            variant="outlined"
+                            color="primary"
+                          />
+                        ))}
+                      </Stack>
+                    </Stack>
+                  </>
+                ) : null}
               </Stack>
-              <Grid container spacing={2}>
-                {annotationsQuery.data.map((annotation) => (
-                  <Grid item xs={12} md={6} key={annotation.id}>
-                    <AnnotationCard
-                      annotation={annotation}
-                      selected={selectedSources.includes(annotation.id)}
-                      onSelect={() => toggleSource(annotation.id)}
-                      actionLabel={selectedSources.includes(annotation.id) ? t('pages.curator.selected') : undefined}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
-              <Divider />
-              <PenmanDiff
-                left={annotationsQuery.data.find((a) => a.id === selectedSources[0])?.penmanText}
-                right={annotationsQuery.data.find((a) => a.id === selectedSources[1])?.penmanText}
-              />
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
 
-      <Card variant="outlined">
-        <CardContent>
-          <Stack spacing={2}>
-            <Typography variant="h6" fontWeight={700}>
-              {t('pages.curator.finalEditor')}
-            </Typography>
-            <PenmanEditor
-              label={t('pages.curator.finalPenman')}
-              value={penmanForActions}
-              onChange={setFinalPenman}
-              placeholder="(a / agree-01 :ARG0 (p / person))"
-            />
-            <TextField
-              label={t('pages.curator.decisionNote')}
-              value={decisionNote}
-              onChange={(event) => setDecisionNote(event.target.value)}
-              multiline
-              minRows={2}
-            />
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-              <Button
-                variant="outlined"
-                onClick={() => validationMutation.mutate()}
-                disabled={!penmanForActions || validationMutation.isPending || !sentenceId}
-              >
-                {t('pages.curator.validate')}
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => adjudicateMutation.mutate()}
-                disabled={!penmanForActions || adjudicateMutation.isPending || !sentenceId}
-              >
-                {t('pages.curator.adjudicate')}
-              </Button>
-              <Button
-                variant="contained"
-                color="success"
-                onClick={() => acceptMutation.mutate()}
-                disabled={acceptMutation.isPending || !sentenceId}
-              >
-                {t('pages.curator.accept')}
-              </Button>
-              <Button
-                variant="outlined"
-                color="warning"
-                onClick={() => reopenMutation.mutate()}
-                disabled={reopenMutation.isPending || !sentenceId}
-              >
-                {t('pages.curator.reopen')}
-              </Button>
-            </Stack>
-            <ValidationSummary
-              report={lastValidation}
-              isLoading={validationMutation.isPending}
-              title={t('pages.curator.validationPanel')}
-            />
-            {adjudicationQuery.data && (
-              <Alert severity="info">
-                {t('pages.curator.lastAdjudication', {
-                  id: adjudicationQuery.data.id,
-                  curator: adjudicationQuery.data.curatorId,
-                })}
-              </Alert>
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="h6" fontWeight={700}>
+                  {t('pages.curator.validationPanel')}
+                </Typography>
+                <ValidationSummary
+                  title={t('pages.curator.validationPanel')}
+                  report={primaryAnnotation?.validityReport}
+                  emptyMessage={t('pages.curator.validationEmpty', { defaultValue: 'Seçilen anotasyon için validasyon yok.' })}
+                />
+                <PenmanDiff
+                  left={primaryAnnotation?.penmanText}
+                  right={secondaryAnnotation?.penmanText}
+                  title={t('pages.curator.diffPanel', { defaultValue: 'Kaynak Diff' })}
+                  leftLabel={primaryAnnotation ? `#${primaryAnnotation.id}` : undefined}
+                  rightLabel={secondaryAnnotation ? `#${secondaryAnnotation.id}` : undefined}
+                  emptyText={t('pages.curator.diffEmpty', { defaultValue: 'Karşılaştırmak için en az bir anotasyon seçin.' })}
+                />
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Card variant="outlined">
+            <CardContent>
+              <AdjudicationForm
+                finalPenman={effectiveFinalPenman}
+                decisionNote={effectiveDecisionNote}
+                selectedSourceIds={effectiveSelectedSources}
+                annotations={annotationsQuery.data}
+                validationReport={lastValidation}
+                isValidating={validationMutation.isPending}
+                isSubmitting={adjudicateMutation.isPending}
+                actionsDisabled={!sentenceId}
+                onPenmanChange={setFinalPenman}
+                onDecisionNoteChange={setDecisionNote}
+                onToggleSource={toggleSource}
+                onValidate={() => {
+                  if (!sentenceId) return
+                  validationMutation.mutate()
+                }}
+                onSubmit={() => {
+                  if (!sentenceId) return
+                  adjudicateMutation.mutate()
+                }}
+                extraActions={
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={() => acceptMutation.mutate()}
+                      disabled={acceptMutation.isPending || !sentenceId}
+                    >
+                      {t('pages.curator.accept')}
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="warning"
+                      onClick={() => reopenMutation.mutate()}
+                      disabled={reopenMutation.isPending || !sentenceId}
+                    >
+                      {t('pages.curator.reopen')}
+                    </Button>
+                  </Stack>
+                }
+              />
+              {adjudicationQuery.data && (
+                <Box mt={2}>
+                  <Alert severity="info">
+                    {t('pages.curator.lastAdjudication', {
+                      id: adjudicationQuery.data.id,
+                      curator: adjudicationQuery.data.curatorId,
+                    })}
+                  </Alert>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
+        </Stack>
+      )}
     </Stack>
   )
 }
