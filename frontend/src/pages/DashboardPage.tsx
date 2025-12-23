@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { projectsApi } from '@/api/projects'
-import { sentencesApi } from '@/api/sentences'
+import { type AssignmentPayload, sentencesApi } from '@/api/sentences'
 import { useAuthContext } from '@/auth/AuthProvider'
+import { AssignmentDialog } from '@/components/dashboard/AssignmentDialog'
 import { ExportPanel } from '@/components/dashboard/export/ExportPanel'
 import { ProjectGrid } from '@/components/dashboard/ProjectGrid'
 import { ProjectSummaryCards } from '@/components/dashboard/ProjectSummaryCards'
-import type { TaskAction } from '@/components/dashboard/TaskList'
-import { TaskList } from '@/components/dashboard/TaskList'
+import { type TaskAction, TaskList } from '@/components/dashboard/TaskList'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { Project, ProjectSummary } from '@/types/project'
 import type { SentenceItem } from '@/types/sentence'
@@ -27,6 +27,8 @@ export const DashboardPage = () => {
   const [isProjectsLoading, setIsProjectsLoading] = useState<boolean>(false)
   const [isSummaryLoading, setIsSummaryLoading] = useState<boolean>(false)
   const [isSentencesLoading, setIsSentencesLoading] = useState<boolean>(false)
+  const [isAssigning, setIsAssigning] = useState<boolean>(false)
+  const [selectedTask, setSelectedTask] = useState<SentenceItem | null>(null)
   const [summaryError, setSummaryError] = useState<string | null>(null)
 
   const parseErrorMessage = useCallback(
@@ -110,6 +112,10 @@ export const DashboardPage = () => {
   }, [fetchSentences, fetchSummary, selectedProjectId])
 
   const handleTaskAction = (action: TaskAction, task: SentenceItem) => {
+    if (action === 'assign') {
+      setSelectedTask(task)
+      return
+    }
     showToast(
       t('pages.dashboard.actionPlaceholder', {
         action: t(`pages.dashboard.actions.${action}`),
@@ -117,6 +123,28 @@ export const DashboardPage = () => {
       }),
       { variant: 'info' },
     )
+  }
+
+  const handleAssign = async (payload: AssignmentPayload) => {
+    if (!selectedTask) return
+    setIsAssigning(true)
+    try {
+      await sentencesApi.assign(selectedTask.id, payload)
+      showToast(t('pages.dashboard.assignSuccess', { sentenceId: selectedTask.id }), {
+        variant: 'success',
+      })
+      const projectId = selectedTask.projectId ?? selectedProjectId
+      if (projectId) {
+        await fetchSentences(projectId)
+      }
+    } catch (error) {
+      showToast(t('pages.dashboard.assignError', { error: parseErrorMessage(error) }), {
+        variant: 'error',
+      })
+    } finally {
+      setIsAssigning(false)
+      setSelectedTask(null)
+    }
   }
 
   return (
@@ -138,6 +166,17 @@ export const DashboardPage = () => {
         userRole={user?.role}
         onAction={handleTaskAction}
       />
+
+      {selectedTask && (
+        <AssignmentDialog
+          key={selectedTask.id}
+          open
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onSubmit={handleAssign}
+          isSubmitting={isAssigning}
+        />
+      )}
     </Stack>
   )
 }

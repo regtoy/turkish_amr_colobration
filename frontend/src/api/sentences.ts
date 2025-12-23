@@ -1,8 +1,8 @@
 import type { AdjudicationItem } from '@/types/adjudication'
 import type { AnnotationItem } from '@/types/annotation'
+import type { Role } from '@/types/auth'
 import type { ReviewItem } from '@/types/review'
-import type { SentenceItem, SentenceStatus } from '@/types/sentence'
-import { inferAssignmentRole } from '@/types/sentence'
+import { inferAssignmentRole, type SentenceItem, type SentenceStatus } from '@/types/sentence'
 import type { ValidationReport } from '@/types/validation'
 
 import { apiClient } from './client'
@@ -17,6 +17,17 @@ interface RawSentence {
   created_at?: string
   updated_at?: string
   assignment_role?: string | null
+}
+
+interface RawAssignment {
+  id: number
+  sentence_id: number
+  user_id: number
+  role: Role
+  is_blind: boolean
+  is_active: boolean
+  created_at?: string
+  updated_at?: string
 }
 
 interface RawAnnotation {
@@ -59,6 +70,30 @@ interface ValidationResponse {
   warnings: Array<{ code: string; message: string; context?: Record<string, unknown> }>
 }
 
+export type AssignmentStrategy = 'round_robin' | 'skill_based'
+
+export interface AssignmentPayload {
+  assigneeIds?: number[]
+  strategy: AssignmentStrategy
+  count: number
+  requiredSkills?: string[]
+  allowMultipleAssignments?: boolean
+  reassignAfterReject?: boolean
+  role: Role
+  isBlind?: boolean
+}
+
+export interface AssignmentItem {
+  id: number
+  sentenceId: number
+  userId: number
+  role: Role
+  isBlind: boolean
+  isActive: boolean
+  createdAt?: string
+  updatedAt?: string
+}
+
 const mapSentence = (data: RawSentence): SentenceItem => {
   const status = data.status as SentenceStatus
   const assignmentRole = (data.assignment_role as SentenceItem['assignmentRole']) ?? null
@@ -91,6 +126,17 @@ const mapValidationResponse = (payload: ValidationResponse): ValidationReport =>
     message: issue.message,
     context: issue.context,
   })),
+})
+
+const mapAssignment = (data: RawAssignment): AssignmentItem => ({
+  id: data.id,
+  sentenceId: data.sentence_id,
+  userId: data.user_id,
+  role: data.role,
+  isBlind: data.is_blind,
+  isActive: data.is_active,
+  createdAt: data.created_at,
+  updatedAt: data.updated_at,
 })
 
 const parseValidationReport = (payload?: string | null): ValidationReport | null => {
@@ -219,5 +265,19 @@ export const sentencesApi = {
   async reopen(sentenceId: number, reason?: string | null): Promise<SentenceItem> {
     const { data } = await apiClient.post<RawSentence>(`/sentences/${sentenceId}/reopen`, { reason })
     return mapSentence(data)
+  },
+
+  async assign(sentenceId: number, payload: AssignmentPayload): Promise<AssignmentItem[]> {
+    const { data } = await apiClient.post<RawAssignment[]>(`/sentences/${sentenceId}/assign`, {
+      assignee_ids: payload.assigneeIds,
+      strategy: payload.strategy,
+      count: payload.count,
+      required_skills: payload.requiredSkills?.length ? payload.requiredSkills : null,
+      allow_multiple_assignments: payload.allowMultipleAssignments ?? false,
+      reassign_after_reject: payload.reassignAfterReject ?? false,
+      role: payload.role,
+      is_blind: payload.isBlind ?? false,
+    })
+    return data.map(mapAssignment)
   },
 }
