@@ -150,7 +150,7 @@ export const sentencesApi = {
       curatorId: data.curator_id,
       finalPenman: data.final_penman,
       decisionNote: data.decision_note,
-      sourceAnnotationIds: data.source_annotation_ids,
+      sourceAnnotationIds: data.source_annotation_ids ?? [],
       createdAt: data.created_at,
     }
   },

@@ -6,12 +6,25 @@ import { highlightPenman } from '@/utils/penman'
 interface PenmanDiffProps {
   left?: string
   right?: string
+  title?: string
+  leftLabel?: string
+  rightLabel?: string
+  maxHeight?: number
+  emptyText?: string
 }
 
-export const PenmanDiff: React.FC<PenmanDiffProps> = ({ left, right }) => {
+export const PenmanDiff: React.FC<PenmanDiffProps> = ({
+  left,
+  right,
+  title = 'PENMAN Diff',
+  leftLabel,
+  rightLabel,
+  maxHeight = 320,
+  emptyText = 'Karşılaştırma için anotasyon seçin.',
+}) => {
   const hasContent = (left && left.trim().length > 0) || (right && right.trim().length > 0)
   if (!hasContent) {
-    return <Typography color="text.secondary">Karşılaştırma için anotasyon seçin.</Typography>
+    return <Typography color="text.secondary">{emptyText}</Typography>
   }
 
   const diff = diffLines(left ?? '', right ?? '')
@@ -20,9 +33,11 @@ export const PenmanDiff: React.FC<PenmanDiffProps> = ({ left, right }) => {
     <Stack spacing={1}>
       <Stack direction="row" spacing={1} alignItems="center">
         <Typography variant="subtitle1" fontWeight={700}>
-          PENMAN Diff
+          {title}
         </Typography>
         <Chip size="small" label="Satır bazlı" variant="outlined" />
+        {leftLabel && <Chip size="small" label={`Sol: ${leftLabel}`} color="primary" variant="outlined" />}
+        {rightLabel && <Chip size="small" label={`Sağ: ${rightLabel}`} color="secondary" variant="outlined" />}
       </Stack>
       <Box
         component="pre"
@@ -35,7 +50,7 @@ export const PenmanDiff: React.FC<PenmanDiffProps> = ({ left, right }) => {
           fontSize: 14,
           border: '1px solid',
           borderColor: 'divider',
-          maxHeight: 320,
+          maxHeight,
         }}
       >
         {diff.map((part, index) => (
