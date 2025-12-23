@@ -10,7 +10,8 @@ dependencies = [
     "sqlmodel>=0.0.22",
     "pydantic-settings>=2.6.1",
     "python-jose>=3.3.0",
-    "passlib[bcrypt]>=1.7.4"
+    "passlib[bcrypt]>=1.7.4",
+    "penman>=1.4.1"
 ]
 
 [build-system]
